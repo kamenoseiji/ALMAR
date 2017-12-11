@@ -40,11 +40,11 @@ sourceMatch <- function(sourceName){
 #-------- Parse arguments
 parseArg <- function( args ){
 	argNum <- length(args)
-	fileNum <- argNum
 	for( index in 1:argNum ){
-		if(substr(args[index], 1,2) == "-D"){ catDir <- substring(args[index], 3);  fileNum <- fileNum - 1}
+		if(substr(args[index], 1,2) == "-C"){ catFile <- substring(args[index], 3) }
+		if(substr(args[index], 1,2) == "-F"){ FLDFFile <- substring(args[index], 3)}
 	}
-	return( list(catDir = catDir, filelist = args[(argNum - fileNum + 1):argNum]))
+	return(list(catFile = catFile, FLDFFile = FLDFFile))
 }
 
 #-------- match time
@@ -121,23 +121,30 @@ readTrecSection <- function(Lines){
 }
 
 #-------- Read ALMA source Catalog
-readALMACat <- function(Lines){
-	numScan <- length(Lines)
-	I <- Ierr <- Freq <- numeric(numScan)
+readALMAcat <- function(Lines){
+	scanNum <- length(Lines)
 	scanDates <- as.Date(as.character(NULL))
 	srcName <- as.character(NULL)
-	for(scan_index in 1:numScan){
+	I <- Ierr <- Freq <- numeric(0)
+	line_index <- 0
+	for(scan_index in 1:scanNum){
 		lineElements <- strsplit(Lines[scan_index], '[ |(|)]+')[[1]]
-		srcName[scan_index] <- as.character(lineElements[10])
-		I[scan_index] <- as.numeric(lineElements[3])
-		if( is.numeric(lineElements[5]) ){ Ierr[scan_index] <- as.numeric(lineElements[5]) }
-		else { Ierr[scan_index] <- 0.2* I[scan_index]}
-		scanDates[scan_index] <- strptime(lineElements[6], "%Y-%m-%d", tz="UTC")
-		Freq[scan_index] <- as.numeric(lineElements[7])
+		if(length(lineElements) < 10) next
+		if(lineElements[8] != "GHz") next
+		if(lineElements[9] != "ALMA") next
+		line_index <- line_index + 1
+		srcName[line_index] <- as.character(lineElements[10])
+		I[line_index] <- as.numeric(lineElements[3])
+		if( is.numeric(lineElements[5]) ){ Ierr[line_index] <- as.numeric(lineElements[5]) }
+		else { Ierr[line_index] <- 0.2* I[line_index]}
+		scanDates[line_index] <- strptime(lineElements[6], "%Y-%m-%d", tz="UTC")
+		Freq[line_index] <- as.numeric(lineElements[7])
 	}
+	
 	DF <- data.frame(Src=srcName, I=I, eI=Ierr, Date=scanDates, freq=Freq)
 	return(DF[order(DF$Date),])
 }
+	
 
 #-------- CheckTrex
 checkTrec <- function(DF){
@@ -157,137 +164,58 @@ nearCat <- function( ObsDF, CatDF ){
 	return( CatDF[nearestIndex,] )
 }
 
+catBind <- function(DF){
+	dateList <- as.Date(unique(DF$Date))
+	dateNum <- length(dateList)
+	I <- freq <- numeric(0)
+	for(date_index in 1:dateNum){
+		index <- which(DF$Date == dateList[date_index])
+		I[date_index] <- median(DF$I[index])
+		freq[date_index] <- median(DF$freq[index])
+	}
+	return(data.frame(Src = rep(DF$Src[1], dateNum), I=I, Date=dateList, freq = freq))
+}
+
 
 #-------- Start program
-argList <- parseArg(commandArgs(trailingOnly = T))
-fileList <- argList$filelist
-catDir <- argList$catDir
-
-if(0){
-fileList <- c(
-'uid___A002_Xabc3f8_X196f-RB_06-Flux.log',
-'uid___A002_Xabc3f8_X202e-RB_06-Flux.log',
-'uid___A002_Xabc3f8_X312b-RB_06-Flux.log',
-'uid___A002_Xabcd5b_Xa4d-RB_06-Flux.log',
-'uid___A002_Xabd867_X4ec-RB_06-Flux.log',
-'uid___A002_Xabd867_X9c2-RB_06-Flux.log',
-'uid___A002_Xabde62_Xa0e-RB_06-Flux.log',
-'uid___A002_Xac0bd6_X22d7-RB_06-Flux.log',
-'uid___A002_Xac0bd6_X745-RB_06-Flux.log',
-'uid___A002_Xac0bd6_X997-RB_06-Flux.log',
-'uid___A002_Xac0269_X853-RB_06-Flux.log',
-'uid___A002_Xac0269_Xb19-RB_06-Flux.log',
-'uid___A002_Xac5575_X6f82-RB_06-Flux.log',
-'uid___A002_Xac5575_X8bfe-RB_06-Flux.log',
-'uid___A002_Xac5575_X55e0-RB_06-Flux.log',
-'uid___A002_Xac5575_X4468-RB_06-Flux.log',
-'uid___A002_Xac5575_X9097-RB_06-Flux.log',
-'uid___A002_Xacaec2_X785-RB_06-Flux.log',
-'uid___A002_Xacbbd0_X712-RB_06-Flux.log',
-'uid___A002_Xacca73_X4147-RB_06-Flux.log',
-'uid___A002_Xacdf75_X1e4d-RB_06-Flux.log',
-'uid___A002_Xad2075_Xd1c-RB_06-Flux.log',
-'uid___A002_Xae4720_X55dc-RB_06-Flux.log',
-'uid___A002_Xae4720_X64de-RB_06-Flux.log',
-'uid___A002_Xae4720_X4860-RB_06-Flux.log',
-'uid___A002_Xaec9ef_X2b-RB_06-Flux.log',
-'uid___A002_Xaec9ef_X13d4-RB_06-Flux.log',
-'uid___A002_Xaec9ef_Xd3c-RB_06-Flux.log',
-'uid___A002_Xaecf7b_X1db7-RB_06-Flux.log',
-'uid___A002_Xaf05a3_X332c-RB_06-Flux.log',
-'uid___A002_Xaf5c32_X1d8a-RB_06-Flux.log',
-'uid___A002_Xaf9ce7_X1edd-RB_06-Flux.log',
-'uid___A002_Xaf9ce7_X3a55-RB_06-Flux.log',
-'uid___A002_Xaf9ce7_X4306-RB_06-Flux.log',
-'uid___A002_Xaf2188_X26cd-RB_06-Flux.log',
-'uid___A002_Xaf2188_X45dc-RB_06-Flux.log',
-'uid___A002_Xaf2188_X3018-RB_06-Flux.log',
-'uid___A002_Xaf2188_X3251-RB_06-Flux.log',
-'uid___A002_Xaf4574_X3567-RB_06-Flux.log',
-'uid___A002_Xb0be8b_X71a4-RB_06-Flux.log',
-'uid___A002_Xb2f730_X5219-RB_06-Flux.log',
-'uid___A002_Xb09eed_Xed56-RB_06-Flux.log',
-'uid___A002_Xb10f33_X6e1-RB_06-Flux.log',
-'uid___A002_Xb18ac0_Xb61f-RB_06-Flux.log',
-'uid___A002_Xb33b61_X2867-RB_06-Flux.log',
-'uid___A002_Xb00171_X18ab-RB_06-Flux.log',
-'uid___A002_Xb00171_Xe7e-RB_06-Flux.log',
-'uid___A002_Xb187bd_X989-RB_06-Flux.log',
-'uid___A002_Xb372db_X1bd8-RB_06-Flux.log',
-'uid___A002_Xb0717b_X7ee-RB_06-Flux.log',
-'uid___A002_Xb39557_X4ce-RB_06-Flux.log',
-'uid___A002_Xbc9c9e_X168d-RB_06-Flux.log',
-'uid___A002_Xbc0724_X13da-RB_06-Flux.log',
-'uid___A002_Xbc0724_X843-RB_06-Flux.log',
-'uid___A002_Xbc8613_X1147-RB_06-Flux.log',
-'uid___A002_Xbc8613_X2404-RB_06-Flux.log',
-'uid___A002_Xbca4b7_X1a7b-RB_06-Flux.log',
-'uid___A002_Xbca4b7_X1dad-RB_06-Flux.log',
-'uid___A002_Xbca4b7_X147-RB_06-Flux.log',
-'uid___A002_Xbcef34_X3e5-RB_06-Flux.log'
-)
-catDir <- "/Volumes/SSD480/SVDATA/ALMA_CatalogB6/"
-}
-
-cat(catDir)
-
-FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
-catFMT <- c('Src', 'I', 'eI', 'Date', 'freq')
-FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
-catDF <- data.frame(matrix(rep(NA, length(catFMT)), nrow=1))[numeric(0),]; colnames(catDF) <- catFMT
-#-------- Source Catalog
-catSourceList <- list.files(catDir, pattern="J")
-for(catFile in catSourceList){
-	cat(catFile); cat('\n')
-	catLines <- readLines(sprintf('%s%s', catDir, catFile))
-	DF <- readALMACat(catLines[grep('ALMA', catLines)])
-	catDF <- rbind(catDF, DF)
-}
-
+#argList <- parseArg(commandArgs(trailingOnly = T))
+argList <- list(FLDFFile = 'Flux.Rdata', catFile = 'ALMAcat.log')
+FLDFFile <- argList$FLDFFile
+catFile <- argList$catFile
+load(FLDFFile)
+catDF <- readALMAcat(readLines(catFile))
 save(catDF, file='catDF.Rdata')
-
-#-------- measurements
-for(fileName in fileList){
-	cat(fileName); cat('\n')
-    FLfileLines <- readLines(fileName)
-	#-------- Read from FL files
-	DF <- readStokesSection(FLfileLines)
-	DF$Date <- eqUTC(FLfileLines)
-	#
-	TrsDF <- readTrecSection(FLfileLines)
-	flagList <- checkTrec(TrsDF)
-	DF$logfile <- fileName
-	DF$flagNum <- length(flagList[[1]]) + length(flagList[[2]]) + length(flagList[[3]])
-	FLDF <- rbind(FLDF, DF)
-}
-save(FLDF, file='FLDF.Rdata')
-
+#if(0){
 pdf('FluxComp.pdf')
 #-------- Compare between measurements and catalog
+representativeFreq <- median(FLDF$Freq)
 sourceList <- as.character(unique(FLDF$Src))
 relDiffAccum <- numeric(0)
 for(source in sourceList){
+	cat(sprintf('Statistics for %s\n', source))
 	#-------- find source in calibrator catalog
-	catSrcDF <- catDF[catDF$Src == sourceMatch(source),]
+	catSrcDF <- catDF[(catDF$Src == sourceMatch(source)) & (abs(catDF$freq - representativeFreq) < 0.1*representativeFreq),]
 	if( length(catSrcDF$I) < 1 ){ next }
-	FLSrcDF <- FLDF[((FLDF$Src == source) & (FLDF$flagNum == 0)) ,]
-	plot(catSrcDF$Date, catSrcDF$I, type='n', xlim=c(min(FLSrcDF$Date), max(FLSrcDF$Date)), ylim=c(0.0, 1.2* max(FLSrcDF$I)), xlab='Date', ylab='Stokes I [Jy]', main=source)
+	catSrcDF <- catBind(catSrcDF)
+	FLSrcDF <- FLDF[FLDF$Src == source,]; FLSrcDF$Date <- as.Date(FLSrcDF$Date)
+	plot(catSrcDF$Date, catSrcDF$I, type='n', xlim=c(min(FLSrcDF$Date), max(FLSrcDF$Date)), ylim=c(0.0, 1.2* max(FLSrcDF$I)), xlab='Date', ylab='Stokes I [Jy]', main=sprintf('%s (%.1f GHz)', source, representativeFreq))
 	lines(catSrcDF$Date, catSrcDF$I, col='blue')
-	points(catSrcDF$Date, catSrcDF$I, pch=21, col='blue')
-	points(FLSrcDF$Date, FLSrcDF$I, pch=20, col='red', cex=0.1)
+	points(catSrcDF$Date, catSrcDF$I, pch=20, col='blue', cex=0.5)
+	points(as.Date(FLSrcDF$Date), FLSrcDF$I, pch=20, col='red', cex=0.1)
 	#-------- Comparison
 	nearestCatDF <- nearCat(FLSrcDF, catSrcDF)
 	DateFilter1 <- which( abs(FLSrcDF$Date - nearestCatDF$Date) < 0.5 )
 	points(FLSrcDF$Date[DateFilter1], FLSrcDF$I[DateFilter1], pch=20, col='red', cex=1)
 	relativeDiff <- 100.0* abs(FLSrcDF$I[DateFilter1] - nearestCatDF$I[DateFilter1])/nearestCatDF$I[DateFilter1]
 	relDiffAccum <- append(relDiffAccum, 100.0*(FLSrcDF$I[DateFilter1] - nearestCatDF$I[DateFilter1])/nearestCatDF$I[DateFilter1])
-	text_sd <- sprintf('Diff. in the same day: Median = %4.1f%%, Max = %4.1f%%', median(relativeDiff), max(relativeDiff))
+	text_sd <- sprintf('Diff. in the same day: Median = %4.1f%%', median(relativeDiff))
 	text(min(FLSrcDF$Date), 0.1*max(FLSrcDF$I), text_sd, pos=4)
 	#hist( 100.0* (FLSrcDF$I[DateFilter10] - nearestCatDF$I[DateFilter10])/nearestCatDF$I[DateFilter10], xlab='Relative Flux Diff. [%]' )
 	#plot( abs(FLSrcDF$Date - nearestCatDF$Date), abs(FLSrcDF$I - nearestCatDF$I)/nearestCatDF$I, pch=20 )
 }
-hist(relDiffAccum, xlab='Relative Flux Difference [%]', ylab='Frequency', main='Diff [A Priori Cal. - ALMA source catalog]', xlim=c(-50,50))
-text_sd <- sprintf('Diff. (median) = %4.1f%%', median(abs(relDiffAccum))); text(10, 550, text_sd, cex=0.7, pos=4)
-text_sd <- sprintf('[%4.1f%% : %4.1f%%] in 50%% probability', quantile(relDiffAccum, 0.25), quantile(relDiffAccum, 0.75)); text(10, 500, text_sd, cex=0.7, pos=4)
-text_sd <- sprintf('[%4.1f%% : %4.1f%%] in 90%% probability', quantile(relDiffAccum, 0.05), quantile(relDiffAccum, 0.95)); text(10, 450, text_sd, cex=0.7, pos=4)
+H <- hist(relDiffAccum, xlab='Relative Flux Difference [%]', ylab='Frequency', main=sprintf('Diff (a priori cal. - ALMA_SC) / ALMA_SC (%.1f GHz)', representativeFreq), xlim=c(-50,50))
+text_sd <- sprintf('Diff. (median) = %4.1f%%', median(abs(relDiffAccum))); text(15, max(H$counts), text_sd, cex=0.7, pos=4)
+text_sd <- sprintf('[%4.1f%% : %4.1f%%] in 50%% probability', quantile(relDiffAccum, 0.25), quantile(relDiffAccum, 0.75)); text(15, 0.9* max(H$counts), text_sd, cex=0.7, pos=4)
+text_sd <- sprintf('[%4.1f%% : %4.1f%%] in 90%% probability', quantile(relDiffAccum, 0.05), quantile(relDiffAccum, 0.95)); text(15, 0.8* max(H$counts), text_sd, cex=0.7, pos=4)
 dev.off()
+#}

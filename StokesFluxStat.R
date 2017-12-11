@@ -1,5 +1,5 @@
-#library(xtable)
-library(maptools)
+library(xtable)
+#library(maptools)
 ALMA_POS <- matrix(c( -67.755, -23.029 ), nrow=1 )
 
 sourceMatch <- function(sourceName){
@@ -46,38 +46,26 @@ parseArg <- function( args ){
 
 #-------- Find Stokes Parameters
 readStokesSection <- function(Lines){
-	pointer <- grep(" -----------------------------------------------------------------------------------------", Lines)
+	pointer <- grep("mean ", Lines)
 	numSource <- length(pointer)
-	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(4)
-	errI <- errQ <- errU <- errV <- numeric(4)
+	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(numSource)
+	errI <- errQ <- errU <- errV <- numeric(numSource)
 	I <- Q <- U <- V <- numeric(0)
 	eI <- eQ <- eU <- eV <- numeric(0)
-	srcList <- character(0); EL <- numeric(0); freq <- numeric(4)
+	srcList <- character(0); EL <- numeric(0)
+	srcUTC <- as.Date(as.character(NULL))
 	for(srcIndex in 1:numSource){
-		if(length(grep('Only', Lines[(pointer[srcIndex]+1):(pointer[srcIndex]+7)])) > 0){ next }
-		if(length(grep('nan', Lines[(pointer[srcIndex]+1):(pointer[srcIndex]+7)])) > 0){ next }
-		srcList <- append(srcList, as.character(strsplit(Lines[pointer[srcIndex] -2], '[ |=]+')[[1]][3]) )
-		EL <- append(EL, strsplit(Lines[pointer[srcIndex] -2], '[ |=]+')[[1]][3])
-		for(spw_index in 1:4){
-			lineElements <- strsplit(Lines[pointer[srcIndex] + spw_index], '[ |(|)]+')[[1]]
-			freq[spw_index] <- as.numeric(lineElements[2])
-			StokesI[spw_index] <- as.numeric(lineElements[4]); errI[spw_index] <- as.numeric(lineElements[5])
-			StokesQ[spw_index] <- as.numeric(lineElements[6]); errQ[spw_index] <- as.numeric(lineElements[7])
-			StokesU[spw_index] <- as.numeric(lineElements[8]); errU[spw_index] <- as.numeric(lineElements[9])
-			StokesV[spw_index] <- as.numeric(lineElements[10]);errV[spw_index] <- as.numeric(lineElements[11])
-		}
-		FREQ <- freq - mean(freq)
-		fitI <- lm(formula= StokesI ~ FREQ, weights=(errI + 0.0005)^(-2))
-		fitQ <- lm(formula= StokesQ ~ FREQ, weights=(errQ + 0.0005)^(-2))
-		fitU <- lm(formula= StokesU ~ FREQ, weights=(errU + 0.0005)^(-2))
-		fitV <- lm(formula= StokesV ~ FREQ, weights=(errV + 0.0005)^(-2))
-		I <- append(I, coef(fitI)[[1]]); eI <- append(eI, coef(summary(fitI))[,"Std. Error"][[1]])
-		Q <- append(Q, coef(fitQ)[[1]]); eQ <- append(eQ, coef(summary(fitQ))[,"Std. Error"][[1]])
-		U <- append(U, coef(fitU)[[1]]); eU <- append(eU, coef(summary(fitU))[,"Std. Error"][[1]])
-		V <- append(V, coef(fitV)[[1]]); eV <- append(eV, coef(summary(fitV))[,"Std. Error"][[1]])
-		#cat(sprintf('Scan%d %s %f %f %f %f\n', srcIndex, srcList[srcIndex], I[srcIndex], Q[srcIndex], U[srcIndex], V[srcIndex]))
+		srcList <- append(srcList, as.character(strsplit(Lines[pointer[srcIndex] -8], '[ |=]+')[[1]][3]) )
+		srcUTC <- append(srcUTC, strptime(strsplit(Lines[pointer[srcIndex] -8], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC"))
+		EL <- append(EL, as.numeric(strsplit(Lines[pointer[srcIndex] -8], '[ |=]+')[[1]][5]))
+		lineElements <- strsplit(Lines[pointer[srcIndex]], '[ |(|)|z]+')[[1]]
+		FREQ <- as.numeric(lineElements[3])
+		I <- append(I, as.numeric(lineElements[5])); eI <- append(eI, as.numeric(lineElements[6]))
+		Q <- append(Q, as.numeric(lineElements[7])); eQ <- append(eQ, as.numeric(lineElements[8]))
+		U <- append(U, as.numeric(lineElements[9])); eU <- append(eU, as.numeric(lineElements[10]))
+		V <- append(V, as.numeric(lineElements[11])); eV <- append(eV, as.numeric(lineElements[12]))
 	}
-	return(data.frame(Src=as.character(srcList), EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, ev=eV))
+	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
 }
 
 #-------- Find Calibrator name
@@ -94,8 +82,8 @@ findCalibrator <- function( Lines ){
 	} else {
 		scalerUTC <- strptime(strsplit(Lines[equalizerPointer], ' ')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz="UTC")
 	}
-	sunsetUTC <- sunriset(ALMA_POS, as.POSIXct(scalerUTC), POSIXct.out=T, direction="sunset")[[2]]
-	return(list(scaler=scalerName, EL=scaleEL, UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24, equalizer=equalizerName))
+#	sunsetUTC <- sunriset(ALMA_POS, as.POSIXct(scalerUTC), POSIXct.out=T, direction="sunset")[[2]]
+	return(list(scaler=scalerName, EL=scaleEL, UTC=scalerUTC, equalizer=equalizerName))
 }
 #-------- Read Aeff Section
 #readAeffSection <- function(Lines){
@@ -155,24 +143,32 @@ checkTrec <- function(DF){
 	return( list(negTrecList, negTsysList, netTskyList) )
 }
 
+#-------- remove blank lines
+removeBlank <- function(Lines){
+	lineLength <- nchar(Lines)
+	index <- which(lineLength > 1)
+	return(Lines[index])
+}
+
+
 #-------- Start program
 Arguments <- commandArgs(trailingOnly = T)
 fileList <- Arguments
-#fileList <- c("uid___A002_Xacc4e4_X1876-RB_03-Flux.log")
+#fileList <- c("uid___A002_Xc52837_X2733-RB_03-Flux.log", "uid___A002_Xc53e4e_X4e7d-RB_03-Flux.log")
 FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
 FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
 
 flagNum <- list()
 for(fileName in fileList){
 	cat(fileName); cat('\n')
-    fileLines <- readLines(fileName)
-	CalList <- findCalibrator(fileLines)
+    fileLines <- removeBlank(readLines(fileName))
+	# CalList <- findCalibrator(fileLines)
 	DF <- readStokesSection(fileLines)
-	DF$Date <- CalList$UTC
+	# DF$Date <- CalList$UTC
 	DF$File <- fileName
-	TrsDF <- readTrecSection(fileLines)
-	flagList <- checkTrec(TrsDF)
-	DF$flagNum <- length(flagList[[1]]) + length(flagList[[2]]) + length(flagList[[3]])
+	# TrsDF <- readTrecSection(fileLines)
+	# flagList <- checkTrec(TrsDF)
+	# DF$flagNum <- length(flagList[[1]]) + length(flagList[[2]]) + length(flagList[[3]])
 	FLDF <- rbind(FLDF, DF)
 }
 FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
@@ -213,15 +209,22 @@ for(src_index in 1:numSrc){
 dev.off()
 #par(par.old)
 
-medI <- medQ <- medU <- numeric(0)
+medI <- medQ <- medU <- eI <- eQ <- eU <- numeric(0)
 for(src_index in 1:numSrc){
 	DF <- FLDF[FLDF$Src == sourceList[src_index],]
 	medI[src_index] <- median(DF$I); medQ[src_index] <- median(DF$Q); medU[src_index] <- median(DF$U)
+	if(length(DF$eI) == 1){
+		eI[src_index] <- DF$eI; eQ[src_index] <- DF$eQ; eU[src_index] <- DF$eU
+	} else {
+		eI[src_index] <- sd(DF$eI); eQ[src_index] <- sd(DF$eQ); eU[src_index] <- sd(DF$eU)
+	}
 }
-polDF <- data.frame( Src=as.character(sourceList), I=medI, Q=medQ, U=medU, P=sqrt(medQ^2 + medU^2) )
-polDF <- polDF[order(polDF$P, decreasing=T),]
+polDF <- data.frame( Src=as.character(sourceList), I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi )
+#polDF <- polDF[order(polDF$P, decreasing=T),]
+polDF <- polDF[order(polDF$Src, decreasing=F),]
 rownames(polDF) <- c(1:nrow(polDF))
+# print(xtable(polDF, digits=3), include.rownames=F)
 save(polDF, file='Pol.Rdata')
-for(src_index in 1:numSrc){
-	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", polDF$Src[src_index], polDF$I[src_index], polDF$Q[src_index]/polDF$I[src_index], polDF$U[src_index]/polDF$I[src_index]))
-}
+#for(src_index in 1:numSrc){
+#	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", polDF$Src[src_index], polDF$I[src_index], polDF$Q[src_index]/polDF$I[src_index], polDF$U[src_index]/polDF#$I[src_index]))
+#}
