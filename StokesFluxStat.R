@@ -233,7 +233,7 @@ sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
 pdf(sprintf('Flux-%s.pdf', BandName), width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
-cat('Source     I [Jy]   %Pol   EVPA [deg]\n')
+cat('Source     I [Jy]   %%Pol   EVPA [deg]\n')
 for(source in sourceList){
 	DF <- FLDF[FLDF$Src == source,]
 	pDF <- polDF[polDF$Src == source,]
