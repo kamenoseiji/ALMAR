@@ -1,6 +1,6 @@
-library(xtable)
+#library(xtable)
 #library(maptools)
-ALMA_POS <- matrix(c( -67.755, -23.029 ), nrow=1 )
+#ALMA_POS <- matrix(c( -67.755, -23.029 ), nrow=1 )
 
 sourceMatch <- function(sourceName){
 	sourceDict <- list(
@@ -154,7 +154,6 @@ removeBlank <- function(Lines){
 #-------- Start program
 Arguments <- commandArgs(trailingOnly = T)
 fileList <- Arguments
-#fileList <- c("uid___A002_Xc52837_X2733-RB_03-Flux.log", "uid___A002_Xc53e4e_X4e7d-RB_03-Flux.log")
 FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
 FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
 
@@ -162,13 +161,8 @@ flagNum <- list()
 for(fileName in fileList){
 	cat(fileName); cat('\n')
     fileLines <- removeBlank(readLines(fileName))
-	# CalList <- findCalibrator(fileLines)
 	DF <- readStokesSection(fileLines)
-	# DF$Date <- CalList$UTC
 	DF$File <- fileName
-	# TrsDF <- readTrecSection(fileLines)
-	# flagList <- checkTrec(TrsDF)
-	# DF$flagNum <- length(flagList[[1]]) + length(flagList[[2]]) + length(flagList[[3]])
 	FLDF <- rbind(FLDF, DF)
 }
 FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
@@ -228,18 +222,20 @@ polDF <- polDF[order(polDF$P, decreasing=T),]
 rownames(polDF) <- c(1:nrow(polDF))
 save(polDF, file='Pol.Rdata')
 
-
-
-# print(xtable(polDF, digits=3), include.rownames=F)
+sourceList <- polDF$Src
 #for(src_index in 1:numSrc){
 #	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", polDF$Src[src_index], polDF$I[src_index], polDF$Q[src_index]/polDF$I[src_index], polDF$U[src_index]/polDF#$I[src_index]))
 #}
 
+# print(xtable(polDF, digits=3), include.rownames=F)
+
 pdf('Flux.pdf', width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
-for(src_index in 1:numSrc){
-	DF <- FLDF[FLDF$Src == sourceList[src_index],]
+for(source in sourceList){
+	DF <- FLDF[FLDF$Src == source,]
+	pDF <- polDF[polDF$Src == source,]
+	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", pDF$Src, pDF$I, pDF$p, pDF$EVPA))
 	#-------- Plot Stokes I
 	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', ylim=c(0, 1.2*max(DF$I)))
 	color_vector <- rep("#000000FF", length(DF$Date))
