@@ -222,7 +222,8 @@ polDF <- polDF[order(polDF$P, decreasing=T),]
 rownames(polDF) <- c(1:nrow(polDF))
 save(polDF, file='Pol.Rdata')
 
-sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
+sourceList <- polDF$Src
+#sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
 #for(src_index in 1:numSrc){
 #	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", polDF$Src[src_index], polDF$I[src_index], polDF$Q[src_index]/polDF$I[src_index], polDF$U[src_index]/polDF#$I[src_index]))
 #}
