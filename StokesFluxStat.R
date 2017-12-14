@@ -222,8 +222,7 @@ polDF <- polDF[order(polDF$P, decreasing=T),]
 rownames(polDF) <- c(1:nrow(polDF))
 save(polDF, file='Pol.Rdata')
 
-sourceList <- polDF$Src
-#sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
+sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
 #for(src_index in 1:numSrc){
 #	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", polDF$Src[src_index], polDF$I[src_index], polDF$Q[src_index]/polDF$I[src_index], polDF$U[src_index]/polDF#$I[src_index]))
 #}
@@ -234,7 +233,6 @@ pdf(sprintf('Flux-%s.pdf', BandName), width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
 for(source in sourceList){
-	if(source[1] != 'J'){ next }
 	DF <- FLDF[FLDF$Src == source,]
 	pDF <- polDF[polDF$Src == source,]
 	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", pDF$Src, pDF$I, pDF$p, pDF$EVPA))
