@@ -18,6 +18,7 @@ sourceMatch <- function(sourceName){
 		c('J1146+3958', 'J1146+399'),
 		c('J1229+0203', '3c273'),
 		c('J1256-0547', '3c279'),
+		c(J1337-1257
 		c('J1337-1257', 'J1337-129'),
 		c('J1427-4206', 'J1427-421'),
 		c('J1517-2422', 'J1517-243'),
@@ -232,10 +233,11 @@ sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
 pdf(sprintf('Flux-%s.pdf', BandName), width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
+cat('Source     I [Jy]   %Pol   EVPA [deg]\n')
 for(source in sourceList){
 	DF <- FLDF[FLDF$Src == source,]
 	pDF <- polDF[polDF$Src == source,]
-	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", pDF$Src, pDF$I, pDF$p, pDF$EVPA))
+	cat(sprintf("%10s  %6.2f  %6.2f  %6.2f\n", pDF$Src, pDF$I, pDF$p, pDF$EVPA))
 	#-------- Plot Stokes I
 	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', ylim=c(0, 1.2*max(DF$I)))
 	color_vector <- rep("#000000FF", length(DF$Date))
