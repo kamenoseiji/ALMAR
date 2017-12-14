@@ -233,6 +233,7 @@ pdf(sprintf('Flux-%s.pdf', BandName), width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
 for(source in sourceList){
+	if(source[1] != 'J'){ next }
 	DF <- FLDF[FLDF$Src == source,]
 	pDF <- polDF[polDF$Src == source,]
 	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", pDF$Src, pDF$I, pDF$p, pDF$EVPA))
