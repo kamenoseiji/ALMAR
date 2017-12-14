@@ -181,6 +181,8 @@ BandName <- sprintf('Band-%d', as.numeric(strsplit(FLDF$File[1], '[-|.|_]')[[1]]
 #-------- Source List
 sourceList <- unique(FLDF$Src)
 numSrc <- length(sourceList)
+
+if(0){
 pdf('Flux.pdf', width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
@@ -207,7 +209,8 @@ for(src_index in 1:numSrc){
 	mtext(side = 3, line=1, outer=T, text = sprintf('%s %s',sourceList[src_index], BandName), cex=2)
 }
 dev.off()
-#par(par.old)
+par(par.old)
+}
 
 medI <- medQ <- medU <- eI <- eQ <- eU <- numeric(0)
 for(src_index in 1:numSrc){
@@ -220,11 +223,42 @@ for(src_index in 1:numSrc){
 	}
 }
 polDF <- data.frame( Src=as.character(sourceList), I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi )
-#polDF <- polDF[order(polDF$P, decreasing=T),]
-polDF <- polDF[order(polDF$Src, decreasing=F),]
+polDF <- polDF[order(polDF$P, decreasing=T),]
+#polDF <- polDF[order(polDF$Src, decreasing=F),]
 rownames(polDF) <- c(1:nrow(polDF))
-# print(xtable(polDF, digits=3), include.rownames=F)
 save(polDF, file='Pol.Rdata')
+
+
+
+# print(xtable(polDF, digits=3), include.rownames=F)
 #for(src_index in 1:numSrc){
 #	cat(sprintf("%10s  %5.1f  %6.3f  %6.3f\n", polDF$Src[src_index], polDF$I[src_index], polDF$Q[src_index]/polDF$I[src_index], polDF$U[src_index]/polDF#$I[src_index]))
 #}
+
+pdf('Flux.pdf', width=8, height=11)
+par.old <- par(no.readonly=TRUE)
+par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
+for(src_index in 1:numSrc){
+	DF <- FLDF[FLDF$Src == sourceList[src_index],]
+	#-------- Plot Stokes I
+	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', ylim=c(0, 1.2*max(DF$I)))
+	color_vector <- rep("#000000FF", length(DF$Date))
+	color_vector[which(DF$flagNum > 0)] <- "#0000FF3F"
+	arrows(as.numeric(DF$Date), DF$I - DF$eI, as.numeric(DF$Date), DF$I + DF$eI, angle=90, length=0.0, col=color_vector)
+	points(DF$Date, DF$I, pch=20, col=color_vector)
+	
+	#-------- Plot polarized flux
+	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', ylim=c(0, 1.2* max(DF$P)))
+	arrows(as.numeric(DF$Date), DF$P - DF$eP, as.numeric(DF$Date), DF$P + DF$eP, angle=90, length=0.0, col=color_vector)
+	points(DF$Date, DF$P, pch=20, col=color_vector)
+	
+	#-------- Plot EVPA
+	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', ylim=c(-90,90))
+	abline(h=90, lwd=0.1); abline(h=-90, lwd=0.1)
+	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=color_vector)
+	points(DF$Date, DF$EVPA*180/pi, pch=20, col=color_vector)
+	
+	mtext(side = 3, line=1, outer=T, text = sprintf('%s %s',sourceList[src_index], BandName), cex=2)
+}
+dev.off()
+par(par.old)
