@@ -229,7 +229,7 @@ sourceList <- polDF$Src
 
 # print(xtable(polDF, digits=3), include.rownames=F)
 
-pdf('Flux.pdf', width=8, height=11)
+pdf(sprintf('Flux-%s.pdf', BandName), width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
 for(source in sourceList){
@@ -254,7 +254,7 @@ for(source in sourceList){
 	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=color_vector)
 	points(DF$Date, DF$EVPA*180/pi, pch=20, col=color_vector)
 	
-	mtext(side = 3, line=1, outer=T, text = sprintf('%s %s',sourceList[src_index], BandName), cex=2)
+	mtext(side = 3, line=1, outer=T, text = sprintf('%s %s', source, BandName), cex=2)
 }
 dev.off()
 par(par.old)
