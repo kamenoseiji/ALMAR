@@ -232,11 +232,11 @@ sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
 pdf(sprintf('Flux-%s.pdf', BandName), width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
-cat('Source     I [Jy]   %Pol   EVPA [deg]\n')
+cat('Source     I [Jy]   Q [Jy]   U [Jy]   %Pol   EVPA [deg]\n')
 for(source in sourceList){
 	DF <- FLDF[FLDF$Src == source,]
 	pDF <- polDF[polDF$Src == source,]
-	cat(sprintf("%10s  %6.2f  %6.2f  %6.2f\n", pDF$Src, pDF$I, pDF$p, pDF$EVPA))
+	cat(sprintf("%10s %6.2f %6.2f %6.2f %6.2f %6.2f\n", pDF$Src, pDF$I, pDF$Q, pDF$U, pDF$p, pDF$EVPA))
 	#-------- Plot Stokes I
 	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', ylim=c(0, 1.2*max(DF$I)))
 	color_vector <- rep("#000000FF", length(DF$Date))
@@ -250,14 +250,10 @@ for(source in sourceList){
 	points(DF$Date, DF$P, pch=20, col=color_vector)
 	
 	#-------- Plot EVPA
-    par(xaxt = "n")
 	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', ylim=c(-90,90))
-    par(xaxt = "s")
-    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y/%m")
 	abline(h=90, lwd=0.1); abline(h=-90, lwd=0.1)
 	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=color_vector)
 	points(DF$Date, DF$EVPA*180/pi, pch=20, col=color_vector)
-	
 	mtext(side = 3, line=1, outer=T, text = sprintf('%s %s', source, BandName), cex=2)
 }
 dev.off()
