@@ -250,7 +250,10 @@ for(source in sourceList){
 	points(DF$Date, DF$P, pch=20, col=color_vector)
 	
 	#-------- Plot EVPA
+    par(xaxt = "n")
 	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', ylim=c(-90,90))
+    par(xaxt = "s")
+    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y/%m")
 	abline(h=90, lwd=0.1); abline(h=-90, lwd=0.1)
 	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=color_vector)
 	points(DF$Date, DF$EVPA*180/pi, pch=20, col=color_vector)
