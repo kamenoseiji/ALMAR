@@ -170,6 +170,7 @@ FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
 FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
 FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- FLDF$eP/FLDF$P
+FLDF$Date <- as.POSIXlt(FLDF$Date, tz="GMT")
 save(FLDF, file='Flux.Rdata')
 BandName <- sprintf('Band-%d', as.numeric(strsplit(FLDF$File[1], '[-|.|_]')[[1]][8]))
 #-------- Source List
