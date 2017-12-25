@@ -4,7 +4,8 @@ library(htmlwidgets)
 library(RCurl)
 #-------- FE-specific PA
 #         Band1      2     3      4     5      6     7      8      9   10
-BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)
+BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
+BandFreq <- c(43.0, 75.0, 97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
 
 #-------- Load Flux.Rdata from web
 load(url("http://www.alma.cl/~skameno/Grid/Stokes/Flux.Rdata"))     # Data frame of FLDF
@@ -20,25 +21,31 @@ Today <- Sys.Date()
 
 plotLST <- function(DF, band){
 	ALMA_lat <- -23.029 * pi / 180
-	sourceNum <- length(DF$Src)
-	LST <- seq(0.0, 2.0*pi, 0.01)
-	plot(LST, LST, type='n', xlim=c(0,24), ylim=c(0,0.5), xlab='LST [h]', ylab='XY response [Jy]', main=sprintf('Band %d', band))
-	for(source_index in 1:sourceNum){
-		HA <- LST - DF$RA[source_index]
-		AZEL <- ha2azel( HA, ALMA_lat, DF$Dec[source_index] )
+	DF$P <- sqrt(DF$Q100^2 + DF$U100^2)
+	DF <- DF[((DF$P > 0.075) & (DF$P/DF$I100 > 0.01)) ,]	# Corr Flux > 75 mJy and %pol > 1%
+	DF <- DF[order(DF$P, decreasing=T),]	
+	sourceList <- as.character(DF$Src)
+	sourceNum <- length(sourceList)
+	LST <- seq(0.0, 23.9, 0.1)
+	lstNum <- length(LST)
+	for(src in sourceList){
+		source_index <- which(DF$Src == src)
+		HA <- LST*pi/12 - DF$RA[source_index]
+		AZEL <- ha2azel( HA, ALMA_lat, DF$DEC[source_index] )
 		AZEL$pa <- AZEL$pa + BandPA[band]
-		CS <- cos(2.0* AZEL$pa)
-		SN <- sin(2.0* AZEL$pa)
-		AZEL$XYcorr <- polDF$U[source_index]*CS - polDF$Q[source_index]*SN
-		ELrange <- which(AZEL$el > pi/7.5)	# EL > 24 deg.
-		if( max(abs(AZEL$XYcorr[ELrange])) > 0.1 ){
-			points(LST[ELrange]*12/pi, abs(AZEL$XYcorr[ELrange]), pch=20, cex=0.5, col=source_index)
-			LSTpeak <- LST[ELrange[which.max(abs(AZEL$XYcorr[ELrange]))]]
-			text(LSTpeak*12/pi, 0.05, DF$Src[source_index], col=source_index)
+		CS <- cos(2.0* AZEL$pa); SN <- sin(2.0* AZEL$pa)
+		freqFact <- (BandFreq[band] / 100)^DF$spixP[source_index]
+		predQ <- DF$Q100[source_index]* freqFact; predU <- DF$U100[source_index] *freqFact
+		AZEL$XYcorr <- abs(predU*CS - predQ*SN)
+		AZEL[AZEL$el < pi/7.5,]$XYcorr <- NA
+		if( src == sourceList[1]){
+			pDF <- data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr)
+		} else {
+			pDF <- rbind(pDF, data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr))
 		}
 	}
+	return(pDF)
 }
-	
 #
 #-------- Source List
 sourceList <- unique(FLDF$Src)
@@ -64,15 +71,13 @@ for(freq_index in 1:numFreq){
 		if(numObs[src_index] == 1){
 			eI[src_index] <- DF$eI; eQ[src_index] <- DF$eQ; eU[src_index] <- DF$eU
 		} else {
-			eI[src_index] <- sd(DF$eI); eQ[src_index] <- sd(DF$eQ); eU[src_index] <- sd(DF$eU)
+			eI[src_index] <- sd(DF$I); eQ[src_index] <- sd(DF$Q); eU[src_index] <- sd(DF$U)
 		}
 	}
-	#polDF <- data.frame( Src=as.character(sourceList), RA=RAList, Dec=DecList, numObs=numObs, I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi )
 	polDF <- data.frame( Src=as.character(sourceList), numObs=numObs, I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi )
 	polDF <- polDF[order(polDF$P, decreasing=T),]
 	rownames(polDF) <- c(1:nrow(polDF))
-	#-------- Plot Pol-LST
-	#plotLST(polDF[!is.na(polDF$I),], bandList[freq_index])
+	#-------- HTML pol-table
 	CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : 60-day median as of %s\n', freqList[freq_index], as.character(Today)), "</p>", sep='\n')
 	cat(sprintf('Frequency %.1f GHz : 60-day median as of %s\n', freqList[freq_index], as.character(Today)))
 	cat('Source       #obs   I [Jy]   Q [Jy]   U [Jy]    %Pol  EVPA [deg]\n')
@@ -80,7 +85,7 @@ for(freq_index in 1:numFreq){
 		pDF <- polDF[index,]
 		cat(sprintf("%10s   (%2d)   %6.2f   %6.2f   %6.2f   %6.1f    %6.1f\n", pDF$Src, pDF$numObs, pDF$I, pDF$Q, pDF$U, pDF$p, pDF$EVPA))
 	}
-	names(polDF) <- c('Source', '#obs', 'I (Jy)', 'err I', 'Q (Jy)', 'err Q', 'U (Jy)', 'err U', 'P (Jy)', 'err P', '%pol', 'EVPA (deg)')
+	names(polDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)')
 	polDF$Source <- paste('<a href="', polDF$Source, '.flux.html" target="_new" >', polDF$Source, ' </a>', sep='')
 	htmlFile <- sprintf('Stokes%.0fGHz.html', freqList[freq_index])
 	html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="http://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
@@ -104,4 +109,47 @@ for(src_index in 1:numSrc){
 	allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=F, titleY=T)
 	htmlFile <- sprintf("%s.flux.html", sourceList[src_index])
 	htmlwidgets::saveWidget(allPlot, htmlFile)
+}
+
+#-------- Source 30-day statistics
+I100 <- Q100 <- U100 <- spixI <- spixP <- numeric(numSrc)
+for(src_index in 1:numSrc){
+	DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (difftime(Today, FLDF$Date, units="days") < 30)) , ]
+	bands <- unique(DF$Band)
+	numBand <- length(bands)
+	predI <- predQ <- predU <- eI <- eQ <- eU <- numObs <- freq <- numeric(numBand)
+	for(band_index in 1:numBand){
+		index <- which(DF$Band == bands[band_index])
+		numObs[band_index] <- length(index)
+		if(numObs[band_index] <= 2){
+			predI[band_index] <- mean(DF$I[index]); predQ[band_index] <- mean(DF$Q[index]); predU[band_index] <- mean(DF$U[index])
+			eI[band_index] <- 10*mean(DF$eI[index]); eQ[band_index] <- 10*mean(DF$eQ[index]); eU[band_index] <- 10*mean(DF$eU[index])
+		} else {
+			deltaDay <- as.numeric(difftime(DF[index,]$Date, Today))
+			fit <- lm(DF$I[index] ~ deltaDay, weights=1/DF$eI[index]^2)
+			predI[band_index] <- summary(fit)$coefficients[1,'Estimate']
+			eI[band_index] <- summary(fit)$coefficients[1,'Std. Error']
+			fit <- lm(DF$Q[index] ~ deltaDay, weights=1/DF$eQ[index]^2)
+			predQ[band_index] <- summary(fit)$coefficients[1,'Estimate']
+			eQ[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
+			fit <- lm(DF$U[index] ~ deltaDay, weights=1/DF$eU[index]^2)
+			predU[band_index] <- summary(fit)$coefficients[1,'Estimate']
+			eU[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
+		}
+		freq[band_index] <- median(DF$Freq[index])
+	}
+	fit <- lm( log(predI) ~ log(freq/100), weights=1.0/eI^2 ); spixI[src_index] <- coef(fit)[2]; I100[src_index] <- exp(coef(fit)[1])
+	fit <- lm(0.5*log(predQ^2 + predU^2) ~ log(freq/100), weights=1.0/eI^2 ); spixP[src_index] <- coef(fit)[2]
+	f100 <- (freq/100.0)^spixP[src_index]
+	fit <- lm(predQ ~ f100+0, weights=1.0/eQ^2); Q100[src_index] <- coef(fit)[1]
+	fit <- lm(predU ~ f100+0, weights=1.0/eU^2); U100[src_index] <- coef(fit)[1]
+}
+srcDF <- data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP)
+
+for(band in c(1,3,4,5,6,7)){
+	plotDF <- plotLST(srcDF, band)
+	pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
+	pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (30-day statistics)', band, as.character(Today)))
+	htmlFile <- sprintf("Band%d_LSTplot.html", band)
+	htmlwidgets::saveWidget(pLST, htmlFile)
 }
