@@ -102,7 +102,7 @@ for(src_index in 1:numSrc){
 	# dataRange <- matrix(c(1.1, -0.1, -0.1, 1.1), nrow=2) %*% c(min(DF$Date), max(DF$Date))
 	plot_I <- plot_ly(DF, x=~Date, y=~I, type="scatter", mode="markers", error_y = ~list(array=eI, thickness=1, width=0), color=~Freq, showlegend=F)
 	plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero'), title=sourceList[src_index])
-	plot_P <- plot_ly(DF, x=~Date, y=~P, type="scatter", mode="markers", error_y = ~list(array=eP, thickness=1, width=0), color=~Freq, showlegend=F)
+	plot_P <- plot_ly(DF, x=~Date, y=~P, type="scatter", mode="markers", error_y = ~list(symmetric=F, array=eP_upper-P, arrayminus=P-eP_lower, thickness=1, width=0), color=~Freq, showlegend=F)
 	plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero'))
 	plot_A <- plot_ly(DF, x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", error_y = ~list(array=eEVPA*180/pi, thickness=1, width=0), color=~Freq, showlegend=T)
 	plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91)))
