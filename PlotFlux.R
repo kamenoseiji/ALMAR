@@ -15,6 +15,8 @@ Err <- try( eval(parse(text = getURL(URL, ssl.verifypeer = FALSE))), silent=FALS
 pos <- regexpr("RB",FLDF$File)
 FLDF$Band <- as.integer(substr(FLDF$File, pos+3, pos+4))
 FLDF$BandPA <- BandPA[FLDF$Band]
+FLDF$errU <- FLDF$eP_upper - FLDF$P
+FLDF$errL <- FLDF$P - FLDF$eP_lower
 
 #-------- Today
 Today <- Sys.Date()
@@ -96,21 +98,21 @@ for(freq_index in 1:numFreq){
 
 #-------- Time-series plots
 for(src_index in 1:numSrc){
+    rm(DF)
 	DF <- FLDF[FLDF$Src == sourceList[src_index],]
-	DF$Freq <- paste(as.character(DF$Freq), "GHz")
+	DF$Freq <- paste(as.character(DF$Freq), "GHz", sep=' ')
 	DF$Date <- as.POSIXct(DF$Date)
-	# dataRange <- matrix(c(1.1, -0.1, -0.1, 1.1), nrow=2) %*% c(min(DF$Date), max(DF$Date))
-	plot_I <- plot_ly(DF, x=~Date, y=~I, type="scatter", mode="markers", error_y = ~list(array=eI, thickness=1, width=0), color=~Freq, showlegend=F)
+    DF <- DF[order(DF$Freq),]; rownames(DF) <- c(1:nrow(DF))
+	plot_I <- plot_ly(DF, x=~Date, y=~I, type="scatter", mode="markers", error_y = list(type="data", symmatric=T, array=~eI, thickness=1, width=0), color=~Freq, showlegend=F)
 	plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero'), title=sourceList[src_index])
-	plot_P <- plot_ly(DF, x=~Date, y=~P, type="scatter", mode="markers", error_y = ~list(symmetric=F, array=eP_upper-P, arrayminus=P-eP_lower, thickness=1, width=0), color=~Freq, showlegend=F)
+	plot_P <- plot_ly(DF, x=~Date, y=~P, type="scatter", mode="markers", error_y = list(type="data", symmetric=F, array=~errU, arrayminus=~errL, thickness=1, width=0), color=~Freq, showlegend=F)
 	plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero'))
-	plot_A <- plot_ly(DF, x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", error_y = ~list(array=eEVPA*180/pi, thickness=1, width=0), color=~Freq, showlegend=T)
+	plot_A <- plot_ly(DF, x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", error_y = list(type="data", array=~eEVPA*180/pi, thickness=1, width=0), color=~Freq, showlegend=T)
 	plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91)))
 	allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=F, titleY=T)
 	htmlFile <- sprintf("%s.flux.html", sourceList[src_index])
 	htmlwidgets::saveWidget(allPlot, htmlFile)
 }
-
 #-------- Source 30-day statistics
 I100 <- Q100 <- U100 <- spixI <- spixP <- numeric(numSrc)
 for(src_index in 1:numSrc){
