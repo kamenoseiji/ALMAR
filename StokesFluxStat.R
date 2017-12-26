@@ -1,6 +1,4 @@
-#library(xtable)
-#library(maptools)
-#ALMA_POS <- matrix(c( -67.755, -23.029 ), nrow=1 )
+library(VGAM)       # for Rice distribution
 
 sourceMatch <- function(sourceName){
 	sourceDict <- list(
@@ -82,24 +80,8 @@ findCalibrator <- function( Lines ){
 	} else {
 		scalerUTC <- strptime(strsplit(Lines[equalizerPointer], ' ')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz="UTC")
 	}
-#	sunsetUTC <- sunriset(ALMA_POS, as.POSIXct(scalerUTC), POSIXct.out=T, direction="sunset")[[2]]
 	return(list(scaler=scalerName, EL=scaleEL, UTC=scalerUTC, equalizer=equalizerName))
 }
-#-------- Read Aeff Section
-#readAeffSection <- function(Lines){
-#	pointer <- grep(" Aeff", Lines) + 1
-#	antName <- character(0)
-#	Ae <- list(numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0))
-#	while( is.na(strsplit(Lines[pointer], ' ')[[1]][1]) == F){
-#		antName <- append(antName, strsplit(Lines[pointer], ' ')[[1]][1])
-#		for(spw in 1:8){
-#			Ae[[spw]] <- append(Ae[[spw]], as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][spw+2]))
-#		}
-#		pointer <- pointer + 1
-#	}
-#	names(Ae) <- c('AeX1', 'AeY1', 'AeX2', 'AeY2', 'AeX3', 'AeY3', 'AeX4', 'AeY4')
-#	return(data.frame(Ant=antName, AeX1=Ae[[1]], AeY1=Ae[[2]], AeX2=Ae[[3]], AeY2=Ae[[4]], AeX3=Ae[[5]], AeY3=Ae[[6]], AeX4=Ae[[7]], AeY4=Ae[[8]]))
-#}
 
 #-------- Read Trec Section
 readTrecSection <- function(Lines){
@@ -167,7 +149,10 @@ for(fileName in fileList){
 }
 FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
 FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
-FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
+sigmaSQ <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
+FLDF$eP_lower <- qrice(0.15, sigmaSQ, FLDF$P)
+FLDF$eP_upper <- qrice(0.85, sigmaSQ, FLDF$P)
+# FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
 FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P)^2
 FLDF$Date <- as.POSIXlt(FLDF$Date, tz="GMT")
@@ -192,7 +177,7 @@ for(src_index in 1:numSrc){
 	
 	#-------- Plot polarized flux
 	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', ylim=c(0, 1.2* max(DF$P)))
-	arrows(as.numeric(DF$Date), DF$P - DF$eP, as.numeric(DF$Date), DF$P + DF$eP, angle=90, length=0.0, col=color_vector)
+	arrows(as.numeric(DF$Date), DF$P - DF$eP_lower, as.numeric(DF$Date), DF$P + DF$eP_upper, angle=90, length=0.0, col=color_vector)
 	points(DF$Date, DF$P, pch=20, col=color_vector)
 	
 	#-------- Plot EVPA
@@ -247,7 +232,7 @@ for(source in sourceList){
 	
 	#-------- Plot polarized flux
 	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', ylim=c(0, 1.2* max(DF$P)))
-	arrows(as.numeric(DF$Date), DF$P - DF$eP, as.numeric(DF$Date), DF$P + DF$eP, angle=90, length=0.0, col=color_vector)
+	arrows(as.numeric(DF$Date), DF$P - DF$eP_lower, as.numeric(DF$Date), DF$P + DF$eP_upper, angle=90, length=0.0, col=color_vector)
 	points(DF$Date, DF$P, pch=20, col=color_vector)
 	
 	#-------- Plot EVPA
