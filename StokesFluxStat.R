@@ -44,7 +44,9 @@ parseArg <- function( args ){
 
 #-------- Find Stokes Parameters
 readStokesSection <- function(Lines){
+	spw_pointer <- grep("SPW  Frequency", Lines)
 	pointer <- grep("mean ", Lines)
+	spwNum <- median(pointer - spw_pointer) - 3
 	numSource <- length(pointer)
 	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(numSource)
 	errI <- errQ <- errU <- errV <- numeric(numSource)
@@ -53,9 +55,9 @@ readStokesSection <- function(Lines){
 	srcList <- character(0); EL <- numeric(0)
 	srcUTC <- as.Date(as.character(NULL))
 	for(srcIndex in 1:numSource){
-		srcList <- append(srcList, as.character(strsplit(Lines[pointer[srcIndex] -8], '[ |=]+')[[1]][3]) )
-		srcUTC <- append(srcUTC, strptime(strsplit(Lines[pointer[srcIndex] -8], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC"))
-		EL <- append(EL, as.numeric(strsplit(Lines[pointer[srcIndex] -8], '[ |=]+')[[1]][5]))
+		srcList <- append(srcList, as.character(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][3]) )
+		srcUTC <- append(srcUTC, strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC"))
+		EL <- append(EL, as.numeric(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][5]))
 		lineElements <- strsplit(Lines[pointer[srcIndex]], '[ |(|)|z]+')[[1]]
 		FREQ <- as.numeric(lineElements[3])
 		I <- append(I, as.numeric(lineElements[5])); eI <- append(eI, as.numeric(lineElements[6]))
