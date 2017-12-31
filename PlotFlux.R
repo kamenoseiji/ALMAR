@@ -68,6 +68,7 @@ for(freq_index in 1:numFreq){
 	medI <- medQ <- medU <- eI <- eQ <- eU <- numObs <- numeric(0)
 	for(src_index in 1:numSrc){
 		DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (FLDF$Freq == freqList[freq_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
+        if(nrow(DF) == 0){ next }
 		medI[src_index] <- median(DF$I); medQ[src_index] <- median(DF$Q); medU[src_index] <- median(DF$U)
 		numObs[src_index] <- length(DF$eI)
 		if(numObs[src_index] == 1){
@@ -76,14 +77,14 @@ for(freq_index in 1:numFreq){
 			eI[src_index] <- sd(DF$I); eQ[src_index] <- sd(DF$Q); eU[src_index] <- sd(DF$U)
 		}
 	}
-	polDF <- data.frame( Src=as.character(sourceList), numObs=numObs, I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi )
+	polDF <- na.omit(data.frame( Src=as.character(sourceList), numObs=numObs, I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi ))
 	polDF <- polDF[order(polDF$P, decreasing=T),]
 	rownames(polDF) <- c(1:nrow(polDF))
 	#-------- HTML pol-table
 	CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : 60-day median as of %s\n', freqList[freq_index], as.character(Today)), "</p>", sep='\n')
 	cat(sprintf('Frequency %.1f GHz : 60-day median as of %s\n', freqList[freq_index], as.character(Today)))
 	cat('Source       #obs   I [Jy]   Q [Jy]   U [Jy]    %Pol  EVPA [deg]\n')
-	for(index in 1:numSrc){
+	for(index in 1:nrow(polDF)){
 		pDF <- polDF[index,]
 		cat(sprintf("%10s   (%2d)   %6.2f   %6.2f   %6.2f   %6.1f    %6.1f\n", pDF$Src, pDF$numObs, pDF$I, pDF$Q, pDF$U, pDF$p, pDF$EVPA))
 	}
@@ -113,10 +114,11 @@ for(src_index in 1:numSrc){
 	htmlFile <- sprintf("%s.flux.html", sourceList[src_index])
 	htmlwidgets::saveWidget(allPlot, htmlFile)
 }
-#-------- Source 30-day statistics
+#-------- Source 45-day statistics
 I100 <- Q100 <- U100 <- spixI <- spixP <- numeric(numSrc)
 for(src_index in 1:numSrc){
-	DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (difftime(Today, FLDF$Date, units="days") < 30)) , ]
+	DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
+    if(nrow(DF) == 0){ next }
 	bands <- unique(DF$Band)
 	numBand <- length(bands)
 	predI <- predQ <- predU <- eI <- eQ <- eU <- numObs <- freq <- numeric(numBand)
@@ -128,13 +130,13 @@ for(src_index in 1:numSrc){
 			eI[band_index] <- 10*mean(DF$eI[index]); eQ[band_index] <- 10*mean(DF$eQ[index]); eU[band_index] <- 10*mean(DF$eU[index])
 		} else {
 			deltaDay <- as.numeric(difftime(DF[index,]$Date, Today))
-			fit <- lm(DF$I[index] ~ deltaDay, weights=1/DF$eI[index]^2)
+			fit <- lm(DF$I[index] ~ deltaDay, weights=1/DF$eI[index]^2/abs(deltaDay + 1))
 			predI[band_index] <- summary(fit)$coefficients[1,'Estimate']
 			eI[band_index] <- summary(fit)$coefficients[1,'Std. Error']
-			fit <- lm(DF$Q[index] ~ deltaDay, weights=1/DF$eQ[index]^2)
+			fit <- lm(DF$Q[index] ~ deltaDay, weights=1/DF$eQ[index]^2/abs(deltaDay + 1))
 			predQ[band_index] <- summary(fit)$coefficients[1,'Estimate']
 			eQ[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
-			fit <- lm(DF$U[index] ~ deltaDay, weights=1/DF$eU[index]^2)
+			fit <- lm(DF$U[index] ~ deltaDay, weights=1/DF$eU[index]^2/abs(deltaDay + 1))
 			predU[band_index] <- summary(fit)$coefficients[1,'Estimate']
 			eU[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
 		}
