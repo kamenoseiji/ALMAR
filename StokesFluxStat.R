@@ -147,8 +147,9 @@ for(fileName in fileList){
     fileLines <- removeBlank(readLines(fileName))
 	DF <- readStokesSection(fileLines)
 	DF$File <- fileName
-	FLDF <- rbind(FLDF, DF)
+	FLDF <- rbind(FLDF, na.omit(DF))
 }
+save(FLDF, file='Flux.Rdata')
 FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
 FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
 sigmaSQ <- sqrt(FLDF$eQ* FLDF$eU)
