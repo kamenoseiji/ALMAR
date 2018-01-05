@@ -17,7 +17,8 @@ parseArg <- function( args ){
 		if(substr(args[index], 1,2) == "-D"){ refDate <- as.Date(substring(args[index], 3));    srcNum <- srcNum - 1 }
 		if(substr(args[index], 1,2) == "-F"){ refFreq <- as.numeric(substring(args[index], 3)); srcNum <- srcNum - 1}
 	}
-	return(list(refDate = refDate, refFreq = refFreq, srcList = args[(argNum - srcNum + 1):argNum] ))
+	srcList = args[(argNum - srcNum + 1):argNum]
+	return(list(refDate = refDate, refFreq = refFreq, srcList = srcList[grep('^J[0-9]',srcList )]))
 }
 
 argList <- parseArg(Arguments)
