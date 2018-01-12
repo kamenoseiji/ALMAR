@@ -37,17 +37,16 @@ sourceMatch <- function(sourceName){
 }
 #-------- Parse arguments
 parseArg <- function( args ){
-	argNum <- length(args)
-	fileNum <- argNum
-	return( list(filelist = args[1:argNum]))
+    fileDF <- read.table(args[1])
+    return( as.character(fileDF[[1]]) )
 }
 
 #-------- Find Stokes Parameters
 readStokesSection <- function(Lines){
-	spw_pointer <- grep("SPW  Frequency", Lines)
 	pointer <- grep("mean ", Lines)
-	spwNum <- median(pointer - spw_pointer) - 3
 	numSource <- length(pointer)
+    spw_pointer <- grep("^ SPW[0-99]", Lines)
+    spwNum <- ceiling(length(spw_pointer) / numSource)
 	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(numSource)
 	errI <- errQ <- errU <- errV <- numeric(numSource)
 	I <- Q <- U <- V <- numeric(0)
@@ -137,7 +136,7 @@ removeBlank <- function(Lines){
 
 #-------- Start program
 Arguments <- commandArgs(trailingOnly = T)
-fileList <- Arguments
+fileList <- parseArg(Arguments)
 FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
 FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
 
