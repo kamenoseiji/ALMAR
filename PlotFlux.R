@@ -1,5 +1,5 @@
 library(xtable)
-library(plotly)
+library(plotly, warn.conflicts=FALSE)
 library(htmlwidgets)
 library(RCurl)
 #-------- FE-specific PA
@@ -9,6 +9,9 @@ BandFreq <- c(43.0, 75.0, 97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
 
 #-------- Load Flux.Rdata from web
 load(url("http://www.alma.cl/~skameno/Grid/Stokes/Flux.Rdata"))     # Data frame of FLDF
+TextDF <- FLDF[order(FLDF$Date),]
+TextDF$Src <- sprintf('%10s ', TextDF$Src)
+write.table(format(TextDF, digits=4), 'amapola.txt', sep='\t', quote=F, col.names=T, row.names=F)
 URL <- "https://raw.githubusercontent.com/kamenoseiji/PolaR/master/date.R"
 Err <- try( eval(parse(text = getURL(URL, ssl.verifypeer = FALSE))), silent=FALSE)
 
@@ -53,15 +56,29 @@ plotLST <- function(DF, band){
 sourceList <- unique(FLDF$Src)
 sourceList <- sourceList[grep('^J[0-9]', sourceList)]  # Filter SSOs out
 numSrc <- length(sourceList)
+#-------- filter by number of observations
+for(src_index in 1:numSrc){
+    index <- which(FLDF$Src == sourceList[src_index])
+    if(length(index) < 9){ FLDF <- FLDF[-index,]}
+}
+sourceList <- unique(FLDF$Src)
+sourceList <- sourceList[grep('^J[0-9]', sourceList)]  # Filter SSOs out
+numSrc <- length(sourceList)
 RAList <- (60.0* as.numeric(substring(sourceList, 2,3)) + as.numeric(substring(sourceList, 4,5))) / 720 * pi # RA in [rad]
 DecList<- as.numeric(substring(sourceList, 6,8))
 DecList<- DecList + sign(DecList)* as.numeric(substring(sourceList, 9,10))/60.0
 DecList<- DecList / 180 * pi # DEC in [rad]
 
 #-------- Freq List
-freqList <- unique(FLDF$Freq)
 bandList <- unique(FLDF$Band)
-numFreq <- length(freqList)
+numFreq <- length(bandList); freqList <- numeric(numFreq)
+for(band_index in 1:length(bandList)){
+    freqList[band_index] <- median(FLDF[FLDF$Band == bandList[band_index],]$Freq)
+    FLDF[FLDF$Band == bandList[band_index],]$Freq <- freqList[band_index]
+}
+#freqList <- unique(FLDF$Freq)
+#bandList <- unique(FLDF$Band)
+#numFreq <- length(freqList)
 
 #-------- HTML table of source flux 
 for(freq_index in 1:numFreq){
@@ -118,7 +135,7 @@ for(src_index in 1:numSrc){
 I100 <- Q100 <- U100 <- spixI <- spixP <- numeric(numSrc)
 for(src_index in 1:numSrc){
 	DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
-    if(nrow(DF) == 0){ next }
+    if(nrow(DF) < 3){ next }
 	bands <- unique(DF$Band)
 	numBand <- length(bands)
 	predI <- predQ <- predU <- eI <- eQ <- eU <- numObs <- freq <- numeric(numBand)
@@ -150,7 +167,7 @@ for(src_index in 1:numSrc){
 }
 srcDF <- data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP)
 
-for(band in c(1,3,4,5,6,7)){
+for(band in c(1,3,4,5,6,7,8,9)){
 	plotDF <- plotLST(srcDF, band)
 	pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
 	pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (30-day statistics)', band, as.character(Today)))
