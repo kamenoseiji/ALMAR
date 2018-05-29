@@ -82,7 +82,7 @@ for(band_index in 1:length(bandList)){
 
 #-------- HTML table of source flux 
 for(freq_index in 1:numFreq){
-	medI <- medQ <- medU <- eI <- eQ <- eU <- numObs <- numeric(0)
+	medI <- medQ <- medU <- eI <- eQ <- eU <- numObs <- rep(NA, numSrc)
 	for(src_index in 1:numSrc){
 		DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (FLDF$Freq == freqList[freq_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
         if(nrow(DF) == 0){ next }
