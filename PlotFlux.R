@@ -118,11 +118,11 @@ for(freq_index in 1:numFreq){
 for(src_index in 1:numSrc){
     rm(DF)
 	DF <- FLDF[FLDF$Src == sourceList[src_index],]
+	DF <- DF[order(DF$Freq),]; rownames(DF) <- c(1:nrow(DF))
 	DF$FreqI <- sprintf("I %.1f GHz", DF$Freq)
 	DF$FreqP <- sprintf("P %.1f GHz", DF$Freq)
 	DF$FreqA <- sprintf("EVPA %.1f GHz", DF$Freq)
 	DF$Date <- as.POSIXct(DF$Date)
-    # ODF <- DF[order(DF$Freq),]  # ; rownames(DF) <- c(1:nrow(DF))
 	plot_I <- plot_ly(DF, x=~Date, y=~I, type="scatter", mode="markers", error_y = list(type="data", symmatric=T, array=~eI, thickness=1, width=0), color=~FreqI, showlegend=T)
 	plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero'), title=sourceList[src_index])
 	plot_P <- plot_ly(DF, x=~Date, y=~P, type="scatter", mode="markers", error_y = list(type="data", symmetric=FALSE, array=~errU, arrayminus=~errL, thickness=1, width=0), color=~FreqP, showlegend=TRUE)
