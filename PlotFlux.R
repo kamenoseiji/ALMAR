@@ -77,6 +77,7 @@ for(band_index in 1:length(bandList)){
     freqList[band_index] <- median(FLDF[FLDF$Band == bandList[band_index],]$Freq)
     FLDF[FLDF$Band == bandList[band_index],]$Freq <- freqList[band_index]
 }
+freqLabel <- sprintf('%.1f GHz', freqList)
 #freqList <- unique(FLDF$Freq)
 #bandList <- unique(FLDF$Band)
 #numFreq <- length(freqList)
@@ -114,21 +115,22 @@ for(freq_index in 1:numFreq){
 	html.body <- paste("<body>", CaptionText, html.table, "</body>")
 	write(paste(html.head, html.body, sep='\n'), htmlFile)
 }
-
 #-------- Time-series plots
 for(src_index in 1:numSrc){
     rm(DF)
 	DF <- FLDF[FLDF$Src == sourceList[src_index],]
-	DF <- DF[order(DF$Freq),]; rownames(DF) <- c(1:nrow(DF))
-	DF$FreqI <- sprintf("I %.1f GHz", DF$Freq)
-	DF$FreqP <- sprintf("P %.1f GHz", DF$Freq)
-	DF$FreqA <- sprintf("EVPA %.1f GHz", DF$Freq)
 	DF$Date <- as.POSIXct(DF$Date)
-	plot_I <- plot_ly(DF, x=~Date, y=~I, type="scatter", mode="markers", error_y = list(type="data", symmatric=T, array=~eI, thickness=1, width=0), color=~FreqI, showlegend=T)
+	plot_I <- plot_ly(data=DF[DF$Freq == freqList[1],], x=~Date, y=~I, type="scatter", mode="markers", name=paste("I", freqLabel[1]), error_y = list(array=~eI, thickness=1, width=0)) %>%
+	          add_trace(data=DF[DF$Freq == freqList[2],], name=paste("I",freqLabel[2])) %>%
+	          add_trace(data=DF[DF$Freq == freqList[3],], name=paste("I",freqLabel[3]))
 	plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero'), title=sourceList[src_index])
-	plot_P <- plot_ly(DF, x=~Date, y=~P, type="scatter", mode="markers", error_y = list(type="data", symmetric=FALSE, array=~errU, arrayminus=~errL, thickness=1, width=0), color=~FreqP, showlegend=TRUE)
+	plot_P <- plot_ly(data=DF[DF$Freq == freqList[1],], x=~Date, y=~P, type="scatter", mode="markers", name=paste("P",freqLabel[1]), error_y = list(symmetric=FALSE, array=~errU, arrayminus=~errL, thickness=1, width=0)) %>%
+	          add_trace(data=DF[DF$Freq == freqList[2],], name=paste("P",freqLabel[2])) %>%
+	          add_trace(data=DF[DF$Freq == freqList[3],], name=paste("P",freqLabel[3]))
 	plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero'))
-	plot_A <- plot_ly(DF, x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", error_y = list(type="data", array=~eEVPA*180/pi, thickness=1, width=0), color=~FreqA, showlegend=T)
+	plot_A <- plot_ly(data=DF[DF$Freq == freqList[1],], x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", name=paste("EVPA",freqLabel[1]), error_y = list(array=~eEVPA*180/pi, thickness=1, width=0)) %>%
+	          add_trace(data=DF[DF$Freq == freqList[2],], name=paste("EVPA",freqLabel[2])) %>%
+	          add_trace(data=DF[DF$Freq == freqList[3],], name=paste("EVPA",freqLabel[3]))
 	plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91)))
 	allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=T, titleY=T)
 	htmlFile <- sprintf("%s.flux.html", sourceList[src_index])
