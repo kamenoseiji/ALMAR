@@ -70,7 +70,8 @@ DecList<- DecList + sign(DecList)* as.numeric(substring(sourceList, 9,10))/60.0
 DecList<- DecList / 180 * pi # DEC in [rad]
 
 #-------- Freq List
-bandList <- unique(FLDF$Band)
+bandList <- c(3,6,7)
+FLDF <- FLDF[FLDF$Band %in% c(3,6,7),]
 numFreq <- length(bandList); freqList <- numeric(numFreq)
 for(band_index in 1:length(bandList)){
     freqList[band_index] <- median(FLDF[FLDF$Band == bandList[band_index],]$Freq)
