@@ -15,14 +15,16 @@ AeDF$DayTime <- 24* (AeDF$mjdSec %% 1)
 AeDF$secZ <- 1.0 / sin(AeDF$EL)
 #-------- Band Separation
 B3 <- AeDF[AeDF$Band == 3,]
+B6 <- AeDF[AeDF$Band == 6,]
 B7 <- AeDF[AeDF$Band == 7,]
 #-------- Antenna Separation
 CMB3 <- B3[grep('CM', B3$Ant),]
+CMB6 <- B6[grep('CM', B3$Ant),]
 CMB7 <- B7[grep('CM', B7$Ant),]
 colores = c('red', 'blue')
 labels = c('Ae X', 'Ae Y')
 antList <- as.character(unique(CMB3$Ant))
-for(band in c(3,7)){
+for(band in c(3,6,7)){
     BandDF <- AeDF[AeDF$Band == band,]
     pdf(sprintf('B%dAe.pdf', band))
     for(ant in antList){
@@ -35,7 +37,7 @@ for(band in c(3,7)){
         print(text_sd, quote=F)
     }
     dev.off()
-    fit <- lm(BandDF, formula = 0.5*(AeX + AeY) ~ relTime + Tau0 + secZ + + DayTime)
+    fit <- lm(BandDF, formula = 0.5*(AeX + AeY) ~ Tau0 + secZ + DayTime)
     text_sd <- summary(fit)
     print(text_sd)
 }
