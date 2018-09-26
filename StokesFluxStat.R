@@ -1,5 +1,8 @@
 library(VGAM)       # for Rice distribution
 
+sysIerr <- 0.02         # temprar Stokes I systematic error
+sysPerr <- 0.0032       # temprar polarization systematic error
+
 sourceMatch <- function(sourceName){
 	sourceDict <- list(
 		c('J0237+2848', 'J0237+288'),
@@ -151,8 +154,10 @@ for(fileName in fileList){
 }
 save(FLDF, file='Flux.Rdata')
 FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
+FLDF$eI <- sqrt(FLDF$eI^2 + (sysIerr*FLDF$I)^2)
 FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
-sigmaSQ <- sqrt(FLDF$eQ* FLDF$eU)
+#sigmaSQ <- sqrt(FLDF$eQ* FLDF$eU)
+sigmaSQ <- sqrt(FLDF$eQ* FLDF$eU + FLDF$I* sysPerr)
 FLDF$eP_lower <- qrice(0.1, sigmaSQ, FLDF$P)
 FLDF[FLDF$P < sigmaSQ,]$eP_lower <- 0.0
 FLDF$eP_upper <- qrice(0.9, sigmaSQ, FLDF$P)
