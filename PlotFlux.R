@@ -28,7 +28,7 @@ Today <- Sys.Date()
 plotLST <- function(DF, band){
 	ALMA_lat <- -23.029 * pi / 180
 	DF$P <- sqrt(DF$Q100^2 + DF$U100^2)
-	DF <- DF[((DF$P > 0.05) & (DF$P/DF$I100 > 0.01)) ,]	# Corr Flux > 50 mJy and %pol > 1%
+	DF <- DF[((DF$P > 0.02) & (DF$P/DF$I100 > 0.005)) ,]	# Corr Flux > 50 mJy and %pol > 1%
 	DF <- DF[order(DF$P, decreasing=T),]	
 	sourceList <- as.character(DF$Src)
 	sourceNum <- length(sourceList)
