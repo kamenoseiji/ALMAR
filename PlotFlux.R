@@ -60,7 +60,7 @@ numSrc <- length(sourceList)
 #-------- filter by number of observations
 for(src_index in 1:numSrc){
     index <- which(FLDF$Src == sourceList[src_index])
-    if(length(index) < 9){ FLDF <- FLDF[-index,]}
+    if(length(index) < 6){ FLDF <- FLDF[-index,]}
 }
 sourceList <- unique(FLDF$Src)
 sourceList <- sourceList[grep('^J[0-9]', sourceList)]  # Filter SSOs out
@@ -151,31 +151,39 @@ for(src_index in 1:numSrc){
 	bands <- unique(DF$Band)
 	numBand <- length(bands)
 	predI <- predQ <- predU <- eI <- eQ <- eU <- numObs <- freq <- numeric(numBand)
-	for(band_index in 1:numBand){
-		index <- which(DF$Band == bands[band_index])
-		numObs[band_index] <- length(index)
-		if(numObs[band_index] <= 2){
-			predI[band_index] <- mean(DF$I[index]); predQ[band_index] <- mean(DF$Q[index]); predU[band_index] <- mean(DF$U[index])
-			eI[band_index] <- 10*mean(DF$eI[index]); eQ[band_index] <- 10*mean(DF$eQ[index]); eU[band_index] <- 10*mean(DF$eU[index])
-		} else {
-			deltaDay <- as.numeric(difftime(DF[index,]$Date, Today))
-			fit <- lm(DF$I[index] ~ deltaDay, weights=1/DF$eI[index]^2/abs(deltaDay + 1))
-			predI[band_index] <- summary(fit)$coefficients[1,'Estimate']
-			eI[band_index] <- summary(fit)$coefficients[1,'Std. Error']
-			fit <- lm(DF$Q[index] ~ deltaDay, weights=1/DF$eQ[index]^2/abs(deltaDay + 1))
-			predQ[band_index] <- summary(fit)$coefficients[1,'Estimate']
-			eQ[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
-			fit <- lm(DF$U[index] ~ deltaDay, weights=1/DF$eU[index]^2/abs(deltaDay + 1))
-			predU[band_index] <- summary(fit)$coefficients[1,'Estimate']
-			eU[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
-		}
-		freq[band_index] <- median(DF$Freq[index])
-	}
-	fit <- lm( log(predI) ~ log(freq/100), weights=1.0/eI^2 ); spixI[src_index] <- coef(fit)[2]; I100[src_index] <- exp(coef(fit)[1])
-	fit <- lm(0.5*log(predQ^2 + predU^2) ~ log(freq/100), weights=1.0/eI^2 ); spixP[src_index] <- coef(fit)[2]
-	f100 <- (freq/100.0)^spixP[src_index]
-	fit <- lm(predQ ~ f100+0, weights=1.0/eQ^2); Q100[src_index] <- coef(fit)[1]
-	fit <- lm(predU ~ f100+0, weights=1.0/eU^2); U100[src_index] <- coef(fit)[1]
+    if(numBand > 1){
+	    for(band_index in 1:numBand){
+	    	index <- which(DF$Band == bands[band_index])
+	    	numObs[band_index] <- length(index)
+	    	if(numObs[band_index] <= 2){
+	    		predI[band_index] <- mean(DF$I[index]); predQ[band_index] <- mean(DF$Q[index]); predU[band_index] <- mean(DF$U[index])
+	    		eI[band_index] <- 10*mean(DF$eI[index]); eQ[band_index] <- 10*mean(DF$eQ[index]); eU[band_index] <- 10*mean(DF$eU[index])
+	    	} else {
+	    		deltaDay <- as.numeric(difftime(DF[index,]$Date, Today))
+	    		fit <- lm(DF$I[index] ~ deltaDay, weights=1/DF$eI[index]^2/abs(deltaDay + 1))
+	    		predI[band_index] <- summary(fit)$coefficients[1,'Estimate']
+	    		eI[band_index] <- summary(fit)$coefficients[1,'Std. Error']
+	    		fit <- lm(DF$Q[index] ~ deltaDay, weights=1/DF$eQ[index]^2/abs(deltaDay + 1))
+	    		predQ[band_index] <- summary(fit)$coefficients[1,'Estimate']
+	    		eQ[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
+	    		fit <- lm(DF$U[index] ~ deltaDay, weights=1/DF$eU[index]^2/abs(deltaDay + 1))
+	    		predU[band_index] <- summary(fit)$coefficients[1,'Estimate']
+	    		eU[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
+	    	}
+	    	freq[band_index] <- median(DF$Freq[index])
+	    }
+    	fit <- lm( log(predI) ~ log(freq/100), weights=1.0/eI^2 ); spixI[src_index] <- coef(fit)[2]; I100[src_index] <- exp(coef(fit)[1])
+    	fit <- lm(0.5*log(predQ^2 + predU^2) ~ log(freq/100), weights=1.0/eI^2 ); spixP[src_index] <- coef(fit)[2]
+    	f100 <- (freq/100.0)^spixP[src_index]
+    	fit <- lm(predQ ~ f100+0, weights=1.0/eQ^2); Q100[src_index] <- coef(fit)[1]
+    	fit <- lm(predU ~ f100+0, weights=1.0/eU^2); U100[src_index] <- coef(fit)[1]
+    } else {
+        I100[src_index] <- median(DF$I)
+        Q100[src_index] <- median(DF$Q)
+        U100[src_index] <- median(DF$U)
+        spixI[src_index] <- -0.7
+        spixP[src_index] <- -0.7
+    }
 }
 srcDF <- data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP)
 
