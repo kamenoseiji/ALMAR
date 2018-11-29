@@ -48,10 +48,11 @@ parseArg <- function( args ){
 #-------- Find Stokes Parameters
 readStokesSection <- function(Lines, bandID=3){
 	pointer <- grep("mean ", Lines)
+	srcPointer <- grep("^ [0-999]", Lines)
 	numSource <- length(pointer)
     spw_pointer <- grep("^ SPW[0-99]", Lines)
     spwNum <- ceiling(length(spw_pointer) / numSource)
-    if(bandID <= 3){ numSubBand <- 2 } else { numSubBand <- 1}
+    if(bandID <= 3){ numSubBand <- 3 } else { numSubBand <- 1}
 	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(numSource* numSubBand)
 	errI <- errQ <- errU <- errV <- numeric(numSource* numSubBand)
 	FREQ <- I <- Q <- U <- V <- numeric(0)
@@ -59,45 +60,40 @@ readStokesSection <- function(Lines, bandID=3){
 	srcList <- character(0); EL <- numeric(0)
 	srcUTC <- as.Date(as.character(NULL))
 	for(srcIndex in 1:numSource){
-		srcList <- append(srcList, as.character(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][3]) )
-		srcUTC <- append(srcUTC, strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC"))
-		EL <- append(EL, as.numeric(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][5]))
-        if( numSubBand == 1){
-		    lineElements <- strsplit(Lines[pointer[srcIndex]], '[ |(|)|z]+')[[1]]
-		    FREQ <- append(FREQ, as.numeric(lineElements[3]))
-		    I <- append(I, as.numeric(lineElements[5])); eI <- append(eI, as.numeric(lineElements[6]))
-		    Q <- append(Q, as.numeric(lineElements[7])); eQ <- append(eQ, as.numeric(lineElements[8]))
-		    U <- append(U, as.numeric(lineElements[9])); eU <- append(eU, as.numeric(lineElements[10]))
-		    V <- append(V, as.numeric(lineElements[11])); eV <- append(eV, as.numeric(lineElements[12]))
-        } 
-        if( numSubBand == 2){
+        spwPointerList <- spw_pointer[which((spw_pointer < pointer[srcIndex]) & (spw_pointer > srcPointer[srcIndex]))]
+        spwFreq <- spwI <- spwQ <- spwU <- spwV <- spweI <- spweQ <- spweU <- spweV <- numeric(spwNum)
+        for(spw_index in 1:spwNum){
+		    lineElements <- strsplit(Lines[spwPointerList[spw_index]], '[ |(|)|z]+')[[1]]
+            spwFreq[spw_index] <- as.numeric(lineElements[3])
+            if(length(lineElements) > 12){
+                spwI[spw_index] <- as.numeric(lineElements[5]); spweI[spw_index] <- as.numeric(lineElements[6]) + 1.0e-4
+                spwQ[spw_index] <- as.numeric(lineElements[7]); spweQ[spw_index] <- as.numeric(lineElements[8]) + 1.0e-4
+                spwU[spw_index] <- as.numeric(lineElements[9]); spweU[spw_index] <- as.numeric(lineElements[10]) + 1.0e-4
+                spwV[spw_index] <- as.numeric(lineElements[11]); spweV[spw_index] <- as.numeric(lineElements[12]) + 1.0e-4
+            } else {
+                spwI[spw_index] <- spwQ[spw_index] <- spwU[spw_index] <- spwV[spw_index] <- NA
+            }
+        }
+        if(sum(!is.na(spwI)) < 3){ next }
+        SBfreq <- median(spwFreq)
+		srcList <- append(srcList, as.character(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][3]) )
+		srcUTC <- append(srcUTC, strptime(strsplit(Lines[srcPointer[srcIndex]], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC"))
+		EL <- append(EL, as.numeric(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][5]))
+        if( numSubBand == 3){
 		    srcList <- append(srcList, rep(as.character(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][3]),2) )
 		    srcUTC <- append(srcUTC, rep(strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC"),2))
 		    EL <- append(EL, rep(as.numeric(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][5]), 2))
-            spwPointerList <- spw_pointer[which((spw_pointer < pointer[srcIndex]) & (spw_pointer > pointer[srcIndex] - 6))]
-            spwFreq <- spwI <- spwQ <- spwU <- spwV <- spweI <- spweQ <- spweU <- spweV <- numeric(spwNum)
-            for(spw_index in 1:spwNum){
-		        lineElements <- strsplit(Lines[spwPointerList[spw_index]], '[ |(|)|z]+')[[1]]
-                spwFreq[spw_index] <- as.numeric(lineElements[3])
-                if(length(lineElements) > 12){
-                    spwI[spw_index] <- as.numeric(lineElements[5]); spweI[spw_index] <- as.numeric(lineElements[6]) + 1.0e-4
-                    spwQ[spw_index] <- as.numeric(lineElements[7]); spweQ[spw_index] <- as.numeric(lineElements[8]) + 1.0e-4
-                    spwU[spw_index] <- as.numeric(lineElements[9]); spweU[spw_index] <- as.numeric(lineElements[10]) + 1.0e-4
-                    spwV[spw_index] <- as.numeric(lineElements[11]); spweV[spw_index] <- as.numeric(lineElements[12]) + 1.0e-4
-                } else {
-                    spwI[spw_index] <- spwQ[spw_index] <- spwU[spw_index] <- spwV[spw_index] <- NA
-                }
-            }
-            SBfreq <- c(mean(spwFreq[1:2]), median(spwFreq), mean(spwFreq[3:4])); FREQ <- append(FREQ, SBfreq)
-            preI <- predict(lm(data=data.frame(freq=spwFreq, I=spwI, eI=spweI), formula=I~freq, weights=1.0/eI^2), new=data.frame(freq=SBfreq), interval='confidence')
-            preQ <- predict(lm(data=data.frame(freq=spwFreq, Q=spwQ, eQ=spweQ), formula=Q~freq, weights=1.0/eQ^2), new=data.frame(freq=SBfreq), interval='confidence')
-            preU <- predict(lm(data=data.frame(freq=spwFreq, U=spwU, eU=spweU), formula=U~freq, weights=1.0/eU^2), new=data.frame(freq=SBfreq), interval='confidence')
-            preV <- predict(lm(data=data.frame(freq=spwFreq, V=spwV, eV=spweV), formula=V~freq, weights=1.0/eV^2), new=data.frame(freq=SBfreq), interval='confidence')
-            I <- append(I, preI[1:3]); eI <- append(eI, 0.5*(preI[7:9]-preI[4:6]))
-            Q <- append(Q, preQ[1:3]); eQ <- append(eQ, 0.5*(preQ[7:9]-preQ[4:6]))
-            U <- append(U, preU[1:3]); eU <- append(eU, 0.5*(preU[7:9]-preU[4:6]))
-            V <- append(V, preV[1:3]); eV <- append(eV, 0.5*(preV[7:9]-preV[4:6]))
+            SBfreq <- append(SBfreq, c(mean(spwFreq[1:2]), mean(spwFreq[3:4])))
         }
+        FREQ <- append(FREQ, SBfreq)
+        preI <- predict(lm(data=data.frame(freq=spwFreq, I=spwI, eI=spweI), formula=I~freq, weights=1.0/eI^2), new=data.frame(freq=SBfreq), interval='confidence')
+        preQ <- predict(lm(data=data.frame(freq=spwFreq, Q=spwQ, eQ=spweQ), formula=Q~freq, weights=1.0/eQ^2), new=data.frame(freq=SBfreq), interval='confidence')
+        preU <- predict(lm(data=data.frame(freq=spwFreq, U=spwU, eU=spweU), formula=U~freq, weights=1.0/eU^2), new=data.frame(freq=SBfreq), interval='confidence')
+        preV <- predict(lm(data=data.frame(freq=spwFreq, V=spwV, eV=spweV), formula=V~freq, weights=1.0/eV^2), new=data.frame(freq=SBfreq), interval='confidence')
+        I <- append(I, preI[1:numSubBand]); eI <- append(eI, 0.5*(preI[(2*numSubBand+1):(3*numSubBand)]-preI[(numSubBand+1):(numSubBand*2)]))
+        Q <- append(Q, preQ[1:numSubBand]); eQ <- append(eQ, 0.5*(preQ[(2*numSubBand+1):(3*numSubBand)]-preQ[(numSubBand+1):(numSubBand*2)]))
+        U <- append(U, preU[1:numSubBand]); eU <- append(eU, 0.5*(preU[(2*numSubBand+1):(3*numSubBand)]-preU[(numSubBand+1):(numSubBand*2)]))
+        V <- append(V, preV[1:numSubBand]); eV <- append(eV, 0.5*(preV[(2*numSubBand+1):(3*numSubBand)]-preV[(numSubBand+1):(numSubBand*2)]))
 	}
 	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
 }
