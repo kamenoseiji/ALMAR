@@ -1,7 +1,7 @@
 library(VGAM)       # for Rice distribution
 
 sysIerr <- 0.005       # temporal Stokes I systematic error
-sysPerr <- 0.002       # temporal polarization systematic error
+sysPerr <- 0.003       # temporal polarization systematic error
 
 sourceMatch <- function(sourceName){
 	sourceDict <- list(
@@ -90,10 +90,10 @@ readStokesSection <- function(Lines, bandID=3){
         preQ <- predict(lm(data=data.frame(freq=spwFreq, Q=spwQ, eQ=spweQ), formula=Q~freq, weights=1.0/eQ^2), new=data.frame(freq=SBfreq), interval='confidence')
         preU <- predict(lm(data=data.frame(freq=spwFreq, U=spwU, eU=spweU), formula=U~freq, weights=1.0/eU^2), new=data.frame(freq=SBfreq), interval='confidence')
         preV <- predict(lm(data=data.frame(freq=spwFreq, V=spwV, eV=spweV), formula=V~freq, weights=1.0/eV^2), new=data.frame(freq=SBfreq), interval='confidence')
-        I <- append(I, preI[1:numSubBand]); eI <- append(eI, 0.5*(preI[(2*numSubBand+1):(3*numSubBand)]-preI[(numSubBand+1):(numSubBand*2)]))
-        Q <- append(Q, preQ[1:numSubBand]); eQ <- append(eQ, 0.5*(preQ[(2*numSubBand+1):(3*numSubBand)]-preQ[(numSubBand+1):(numSubBand*2)]))
-        U <- append(U, preU[1:numSubBand]); eU <- append(eU, 0.5*(preU[(2*numSubBand+1):(3*numSubBand)]-preU[(numSubBand+1):(numSubBand*2)]))
-        V <- append(V, preV[1:numSubBand]); eV <- append(eV, 0.5*(preV[(2*numSubBand+1):(3*numSubBand)]-preV[(numSubBand+1):(numSubBand*2)]))
+        I <- append(I, preI[1:numSubBand]); eI <- append(eI, 0.25*(preI[(2*numSubBand+1):(3*numSubBand)]-preI[(numSubBand+1):(numSubBand*2)]))
+        Q <- append(Q, preQ[1:numSubBand]); eQ <- append(eQ, 0.25*(preQ[(2*numSubBand+1):(3*numSubBand)]-preQ[(numSubBand+1):(numSubBand*2)]))
+        U <- append(U, preU[1:numSubBand]); eU <- append(eU, 0.25*(preU[(2*numSubBand+1):(3*numSubBand)]-preU[(numSubBand+1):(numSubBand*2)]))
+        V <- append(V, preV[1:numSubBand]); eV <- append(eV, 0.25*(preV[(2*numSubBand+1):(3*numSubBand)]-preV[(numSubBand+1):(numSubBand*2)]))
 	}
 	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
 }
@@ -186,10 +186,10 @@ FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
 FLDF$eI <- sqrt(FLDF$eI^2 + (sysIerr*FLDF$I)^2)
 FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
 #sigmaSQ <- sqrt(FLDF$eQ* FLDF$eU)
-sigmaSQ <- sqrt(FLDF$eQ^2 + FLDF$eU^2 + (FLDF$I* sysPerr)^2)
-FLDF$eP_lower <- qrice(0.1, sigmaSQ, FLDF$P)
+sigmaSQ <- sqrt(FLDF$eQ * FLDF$eU + (FLDF$I* sysPerr)^2)
+FLDF$eP_lower <- qrice(0.15, sigmaSQ, FLDF$P)
 FLDF[FLDF$P < sigmaSQ,]$eP_lower <- 0.0
-FLDF$eP_upper <- qrice(0.9, sigmaSQ, FLDF$P)
+FLDF$eP_upper <- qrice(0.85, sigmaSQ, FLDF$P)
 # FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
 FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P)^2
