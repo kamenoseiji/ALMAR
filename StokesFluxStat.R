@@ -181,7 +181,7 @@ for(fileName in fileList){
 	DF$File <- fileName
 	FLDF <- rbind(FLDF, na.omit(DF))
 }
-save(FLDF, file='Flux.Rdata')
+#save(FLDF, file='Flux.Rdata')
 FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
 FLDF$eI <- sqrt(FLDF$eI^2 + (sysIerr*FLDF$I)^2)
 FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
@@ -195,6 +195,13 @@ FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P)^2
 FLDF$Date <- as.POSIXlt(FLDF$Date, tz="GMT")
 save(FLDF, file='Flux.Rdata')
+#---- Output to text data
+TextDF <- FLDF[order(FLDF$Date),]
+index <- which(abs(TextDF$Freq - 97.45) < 1.0)
+TextDF <- TextDF[-index,]
+TextDF$Src <- sprintf('%10s ', TextDF$Src)
+write.table(format(TextDF, digits=4), 'amapola.txt', sep='\t', quote=F, col.names=T, row.names=F)
+#
 BandName <- sprintf('Band-%d', as.numeric(strsplit(FLDF$File[1], '[-|.|_]')[[1]][8]))
 #-------- Source List
 sourceList <- unique(FLDF$Src)

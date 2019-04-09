@@ -10,11 +10,11 @@ BandFreq <- c(43.0, 75.0, 97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
 
 #-------- Load Flux.Rdata from web
 load(url("http://www.alma.cl/~skameno/Grid/Stokes/Flux.Rdata"))     # Data frame of FLDF
-TextDF <- FLDF[order(FLDF$Date),]
-index <- which(abs(TextDF$Freq - 97.45) < 1.0)
-TextDF <- TextDF[-index,]
-TextDF$Src <- sprintf('%10s ', TextDF$Src)
-write.table(format(TextDF, digits=4), 'amapola.txt', sep='\t', quote=F, col.names=T, row.names=F)
+#TextDF <- FLDF[order(FLDF$Date),]
+#index <- which(abs(TextDF$Freq - 97.45) < 1.0)
+#TextDF <- TextDF[-index,]
+#TextDF$Src <- sprintf('%10s ', TextDF$Src)
+#write.table(format(TextDF, digits=4), 'amapola.txt', sep='\t', quote=F, col.names=T, row.names=F)
 URL <- "https://raw.githubusercontent.com/kamenoseiji/PolaR/master/date.R"
 Err <- try( eval(parse(text = getURL(URL, ssl.verifypeer = FALSE))), silent=FALSE)
 

@@ -5,8 +5,8 @@ cd WORK
 ls *Flux.log > fileList
 Rscript ../StokesFluxStat.R fileList
 scp Flux.Rdata skameno@ssh.alma.cl:/home/skameno/public_html/Grid/Stokes/
-Rscript ../PlotFlux.R
 scp amapola.txt skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
+Rscript ../PlotFlux.R
 scp *.html skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
 cd ..
 #rm -rf WORK
