@@ -31,11 +31,11 @@ Today <- Sys.Date()
 plotLST <- function(DF, band){
 	ALMA_lat <- -23.029 * pi / 180
 	DF$P <- sqrt(DF$Q100^2 + DF$U100^2)
-	DF <- DF[((DF$P > 0.02) & (DF$P/DF$I100 > 0.005)) ,]	# Corr Flux > 50 mJy and %pol > 1%
+	DF <- DF[((DF$P > 0.05) & (DF$P/DF$I100 > 0.03) & (abs(DF$DEC - ALMA_lat) > 4.0*pi/180.0)) ,]	# Corr Flux > 50 mJy and %pol > 3% and zenith avoidance
 	DF <- DF[order(DF$P, decreasing=T),]	
 	sourceList <- as.character(DF$Src)
 	sourceNum <- length(sourceList)
-	LST <- seq(0.0, 23.9, 0.1)
+	LST <- seq(0.0, 23.95, 0.05)
 	lstNum <- length(LST)
 	for(src in sourceList){
 		source_index <- which(DF$Src == src)
@@ -100,7 +100,7 @@ for(freq_index in 1:numFreq){
 			eI[src_index] <- sd(DF$I); eQ[src_index] <- sd(DF$Q); eU[src_index] <- sd(DF$U)
 		}
 	}
-	polDF <- na.omit(data.frame( Src=as.character(sourceList), numObs=numObs, I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi ))
+	polDF <- na.omit(data.frame( Src=as.character(sourceList), numObs=numObs, I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi, sdEVPA=90.0*sqrt(eQ^2 + eU^2)/sqrt(medQ^2 + medU^2)/pi ))
 	polDF <- polDF[order(polDF$P, decreasing=T),]
 	rownames(polDF) <- c(1:nrow(polDF))
 	#-------- HTML pol-table
@@ -109,13 +109,13 @@ for(freq_index in 1:numFreq){
 	cat('Source       #obs   I [Jy]   Q [Jy]   U [Jy]    %Pol  EVPA [deg]\n')
 	for(index in 1:nrow(polDF)){
 		pDF <- polDF[index,]
-		cat(sprintf("%10s   (%2d)   %6.2f   %6.2f   %6.2f   %6.1f    %6.1f\n", pDF$Src, pDF$numObs, pDF$I, pDF$Q, pDF$U, pDF$p, pDF$EVPA))
+		cat(sprintf("%10s   (%2d)   %6.2f   %6.2f   %6.2f   %6.1f   %6.1f   %6.1f\n", pDF$Src, pDF$numObs, pDF$I, pDF$Q, pDF$U, pDF$p, pDF$EVPA, pDF$sdEVPA))
 	}
-	names(polDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)')
+	names(polDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)', 'sd(EVPA)')
 	polDF$Source <- paste('<a href="', polDF$Source, '.flux.html" target="_new" >', polDF$Source, ' </a>', sep='')
 	htmlFile <- sprintf('Stokes%.0fGHz.html', freqList[freq_index])
 	html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="http://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
-	html.table <- paste(print(xtable(polDF, digits=c(0,0,0,3,3,3,3,3,3,3,3,1,1)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
+	html.table <- paste(print(xtable(polDF, digits=c(0,0,0,3,3,3,3,3,3,3,3,1,1,1)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
 	html.body <- paste("<body>", CaptionText, html.table, "</body>")
 	write(paste(html.head, html.body, sep='\n'), htmlFile)
 }
@@ -145,7 +145,7 @@ for(src_index in 1:numSrc){
 	htmlwidgets::saveWidget(allPlot, htmlFile)
 	rm(plot_I); rm(plot_P); rm(plot_A); rm(allPlot); rm(htmlFile)
 }
-#-------- Source 45-day statistics
+#-------- Source 60-day statistics
 I100 <- Q100 <- U100 <- spixI <- spixP <- numeric(numSrc)
 for(src_index in 1:numSrc){
 	rm(DF)

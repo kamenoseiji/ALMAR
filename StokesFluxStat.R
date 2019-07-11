@@ -167,6 +167,7 @@ removeBlank <- function(Lines){
 
 #-------- Start program
 Arguments <- commandArgs(trailingOnly = T)
+#Arguments <- 'fileList'
 fileList <- parseArg(Arguments)
 FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
 FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
