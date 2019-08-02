@@ -128,17 +128,17 @@ for(src_index in 1:numSrc){
 	plot_I <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~I, type="scatter", mode="markers", color=paste("I", freqLabel[1]), colors=bandColor, error_y = list(array=~eI, thickness=1, width=0))
     if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[2],], color=paste("I", freqLabel[2]))}
     if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[3],], color=paste("I", freqLabel[3]))}
-	plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero'), title=sourceList[src_index])
+	plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero', hoverformat='.3f'), title=sourceList[src_index])
 
 	plot_P <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~P, type="scatter", mode="markers", color=paste("P",freqLabel[1]), colors=bandColor, error_y = list(symmetric=FALSE, array=~errU, arrayminus=~errL, thickness=1, width=0))
     if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[2],], color=paste("P",freqLabel[2]))}
     if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[3],], color=paste("P",freqLabel[3]))}
-	plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero'))
+	plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero', hoverformat='.3f'))
 
 	plot_A <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", color=paste("EVPA",freqLabel[1]), colors=bandColor, error_y = list(array=~eEVPA*180/pi, thickness=1, width=0))
     if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[2],], color=paste("EVPA",freqLabel[2]))}
     if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[3],], color=paste("EVPA",freqLabel[3]))}
-	plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91)))
+	plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91), hoverformat='.1f'))
 
 	allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=T, titleY=T)
 	htmlFile <- sprintf("%s.flux.html", sourceList[src_index])
