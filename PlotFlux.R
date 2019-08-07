@@ -10,11 +10,6 @@ BandFreq <- c(43.0, 75.0, 97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
 
 #-------- Load Flux.Rdata from web
 load(url("http://www.alma.cl/~skameno/Grid/Stokes/Flux.Rdata"))     # Data frame of FLDF
-#TextDF <- FLDF[order(FLDF$Date),]
-#index <- which(abs(TextDF$Freq - 97.45) < 1.0)
-#TextDF <- TextDF[-index,]
-#TextDF$Src <- sprintf('%10s ', TextDF$Src)
-#write.table(format(TextDF, digits=4), 'amapola.txt', sep='\t', quote=F, col.names=T, row.names=F)
 URL <- "https://raw.githubusercontent.com/kamenoseiji/PolaR/master/date.R"
 Err <- try( eval(parse(text = getURL(URL, ssl.verifypeer = FALSE))), silent=FALSE)
 
@@ -30,9 +25,8 @@ Today <- Sys.Date()
 
 plotLST <- function(DF, band){
 	ALMA_lat <- -23.029 * pi / 180
-	DF$P <- sqrt(DF$Q100^2 + DF$U100^2)
-	DF <- DF[((DF$P > 0.05) & (DF$P/DF$I100 > 0.03) & (abs(DF$DEC - ALMA_lat) > 4.0*pi/180.0)) ,]	# Corr Flux > 50 mJy and %pol > 3% and zenith avoidance
-	DF <- DF[order(DF$P, decreasing=T),]	
+    pDF <- data.frame()
+	DF <- DF[abs(DF$DEC - ALMA_lat) > 4.0*pi/180.0,]	# zenith avoidance of 4 degree
 	sourceList <- as.character(DF$Src)
 	sourceNum <- length(sourceList)
 	LST <- seq(0.0, 23.95, 0.05)
@@ -43,11 +37,14 @@ plotLST <- function(DF, band){
 		AZEL <- ha2azel( HA, ALMA_lat, DF$DEC[source_index] )
 		AZEL$pa <- AZEL$pa + BandPA[band]
 		CS <- cos(2.0* AZEL$pa); SN <- sin(2.0* AZEL$pa)
-		freqFact <- (BandFreq[band] / 100)^DF$spixP[source_index]
-		predQ <- DF$Q100[source_index]* freqFact; predU <- DF$U100[source_index] *freqFact
+		freqIFact <- (BandFreq[band] / 100)^DF$spixI[source_index]
+		freqPFact <- (BandFreq[band] / 100)^DF$spixP[source_index]
+		predQ <- DF$Q100[source_index]* freqPFact; predU <- DF$U100[source_index] *freqPFact
+        predP <- sqrt(predQ^2 + predU^2); predI <- DF$I100[source_index]* freqIFact
+        if((predP < 0.05) | (predP < 0.03* predI))  next
 		AZEL$XYcorr <- abs(predU*CS - predQ*SN)
 		AZEL[AZEL$el < pi/7.5,]$XYcorr <- NA
-		if( src == sourceList[1]){
+		if( nrow(pDF) == 0 ){
 			pDF <- data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr)
 		} else {
 			pDF <- rbind(pDF, data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr))
@@ -82,10 +79,6 @@ for(band_index in 1:length(bandList)){
     FLDF[FLDF$Band == bandList[band_index],]$Freq <- freqList[band_index]
 }
 freqLabel <- sprintf('%.1f GHz', freqList)
-#freqList <- unique(FLDF$Freq)
-#bandList <- unique(FLDF$Band)
-#numFreq <- length(freqList)
-
 #-------- HTML table of source flux 
 for(freq_index in 1:numFreq){
 	medI <- medQ <- medU <- eI <- eQ <- eU <- numObs <- rep(NA, numSrc)
