@@ -9,7 +9,8 @@ BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/1
 BandFreq <- c(43.0, 75.0, 97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
 
 #-------- Load Flux.Rdata from web
-load(url("http://www.alma.cl/~skameno/Grid/Stokes/Flux.Rdata"))     # Data frame of FLDF
+FluxDataURL <- "http://www.alma.cl/~skameno/Grid/Stokes/"
+load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
 URL <- "https://raw.githubusercontent.com/kamenoseiji/PolaR/master/date.R"
 Err <- try( eval(parse(text = getURL(URL, ssl.verifypeer = FALSE))), silent=FALSE)
 
@@ -82,6 +83,7 @@ freqLabel <- sprintf('%.1f GHz', freqList)
 #-------- HTML table of source flux 
 for(freq_index in 1:numFreq){
 	medI <- medQ <- medU <- eI <- eQ <- eU <- numObs <- rep(NA, numSrc)
+    lastDateIndex <- which.max(as.numeric(FLDF[FLDF$Freq == freqList[freq_index],]$Date))
 	for(src_index in 1:numSrc){
 		DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (FLDF$Freq == freqList[freq_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
         if(nrow(DF) == 0){ next }
@@ -97,7 +99,8 @@ for(freq_index in 1:numFreq){
 	polDF <- polDF[order(polDF$P, decreasing=T),]
 	rownames(polDF) <- c(1:nrow(polDF))
 	#-------- HTML pol-table
-	CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : 60-day median as of %s\n', freqList[freq_index], as.character(Today)), "</p>", sep='\n')
+	CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : 60-day median as of %s / ', freqList[freq_index], as.character(Today)),sep='')
+    CaptionText <- paste(CaptionText, '<a href="', FluxDataURL, FLDF[FLDF$Freq == freqList[freq_index],]$File[lastDateIndex], '" target="_new">', 'Last Observation on ', as.character(FLDF[FLDF$Freq == freqList[freq_index],]$Date[lastDateIndex]), "</p>", sep='') 
 	cat(sprintf('Frequency %.1f GHz : 60-day median as of %s\n', freqList[freq_index], as.character(Today)))
 	cat('Source       #obs   I [Jy]   Q [Jy]   U [Jy]    %Pol  EVPA [deg]\n')
 	for(index in 1:nrow(polDF)){
