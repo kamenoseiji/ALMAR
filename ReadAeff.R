@@ -36,8 +36,8 @@ readAeffSection <- function(Lines){
 
 #-------- Start program
 Arguments <- commandArgs(trailingOnly = T)
-#fileList <- Arguments
-fileList <- c("uid___A002_Xe48598_X24139-RB_03-Flux.log")
+fileList <- Arguments
+#fileList <- c("uid___A002_Xe48598_X24139-RB_03-Flux.log")
 FMT <- c('Ant', 'AeX1', 'AeY1', 'AeX2', 'AeY2', 'AeX3', 'AeY3', 'AeX4', 'AeY4', 'Band', 'calibrator', 'EL', 'Date', 'sunset')
 AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 for(fileName in fileList){
