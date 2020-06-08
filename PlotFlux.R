@@ -3,6 +3,7 @@ library(xtable)
 library(plotly, warn.conflicts=FALSE)
 library(htmlwidgets)
 library(RCurl)
+ALMA_lat <- -23.029 * pi / 180
 #-------- FE-specific PA
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
@@ -22,10 +23,10 @@ FLDF$errL <- FLDF$P - FLDF$eP_lower
 index <- which((FLDF$Band == 3) & (abs(FLDF$Freq - 97.45) > 1.0))
 FLDF <- FLDF[-index,]
 #-------- Today
-Today <- Sys.Date()
+#Today <- Sys.Date()
+Today <- "2020-03-01"
 
 plotLST <- function(DF, band){
-	ALMA_lat <- -23.029 * pi / 180
     pDF <- data.frame()
 	DF <- DF[abs(DF$DEC - ALMA_lat) > 4.0*pi/180.0,]	# zenith avoidance of 4 degree
 	sourceList <- as.character(DF$Src)
@@ -142,7 +143,8 @@ for(src_index in 1:numSrc){
 	rm(plot_I); rm(plot_P); rm(plot_A); rm(allPlot); rm(htmlFile)
 }
 #-------- Source 60-day statistics
-I100 <- Q100 <- U100 <- spixI <- spixP <- numeric(numSrc)
+I100 <- Q100 <- U100 <- numeric(numSrc)
+spixI <- spixP <- rep(NA, numSrc)
 for(src_index in 1:numSrc){
 	rm(DF)
 	DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
@@ -184,7 +186,8 @@ for(src_index in 1:numSrc){
         spixP[src_index] <- -0.7
     }
 }
-srcDF <- data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP)
+srcDF <- na.omit(data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP))
+write.csv(srcDF[(abs(srcDF$DEC - ALMA_lat) > 4.0*pi/180.0),], 'PolQuery.CSV', row.names=FALSE)
 
 for(band in c(1,3,4,5,6,7,8,9)){
 	plotDF <- plotLST(srcDF, band)
