@@ -38,7 +38,7 @@ readAeffSection <- function(Lines){
 Arguments <- commandArgs(trailingOnly = T)
 fileList <- Arguments
 #fileList <- c("uid___A002_Xe48598_X24139-RB_03-Flux.log")
-FMT <- c('Ant', 'AeX1', 'AeY1', 'AeX2', 'AeY2', 'AeX3', 'AeY3', 'AeX4', 'AeY4', 'Band', 'calibrator', 'EL', 'Date', 'sunset')
+FMT <- c('Ant', 'AeX', 'AeY', 'AeX1', 'AeY1', 'AeX2', 'AeY2', 'AeX3', 'AeY3', 'AeX4', 'AeY4', 'Band', 'calibrator', 'EL', 'Date', 'sunset')
 AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 for(fileName in fileList){
 	cat(fileName); cat('\n')
@@ -52,6 +52,8 @@ for(fileName in fileList){
 	DF$Date <- CalList$UTC
 	DF$sunset <- CalList$sunset
 	DF$File <- fileName
+	DF$AeX <- median( c(DF$AeX1, DF$AeX2, DF$AeX3, DF$AeX4) )
+	DF$AeY <- median( c(DF$AeY1, DF$AeY2, DF$AeY3, DF$AeY4) )
 	AeDF <- rbind(AeDF, DF)
 }
 save(AeDF, file='AeDF.Rdata')
