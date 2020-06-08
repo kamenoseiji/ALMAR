@@ -11,9 +11,12 @@ parseArg <- function( args ){
 findCalibrator <- function( Lines ){
 	datePointer <- grep("Flux Calibrator is", Lines)
     if(length(datePointer) == 0){return( list(-1)) }
+	fluxCalName <- strsplit(Lines[datePointer], ' ')[[1]][4]
 	scalerUTC <- strptime(strsplit(Lines[datePointer], ' ')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC")
 	sunsetUTC <- sunriset(ALMA_POS, as.POSIXct(scalerUTC), POSIXct.out=T, direction="sunset")[[2]]
-	return(list(UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24))
+	datePointer <- grep(fluxCalName, Lines)[2]
+	EL <- as.numeric(strsplit(Lines[datePointer], ' +|=')[[1]][5])
+	return(list(calibrator=fluxCalName, EL=EL, UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24))
 }
 #-------- Read Aeff Section
 readAeffSection <- function(Lines){
@@ -33,9 +36,9 @@ readAeffSection <- function(Lines){
 
 #-------- Start program
 Arguments <- commandArgs(trailingOnly = T)
-fileList <- Arguments
-#fileList <- c("uid___A002_Xbd8c60_X117b-RB_03-Flux.log")
-FMT <- c('Ant', 'AeX1', 'AeY1', 'AeX2', 'AeY2', 'AeX3', 'AeY3', 'AeX4', 'AeY4', 'EL', 'Date', 'sunset', 'EQ')
+#fileList <- Arguments
+fileList <- c("uid___A002_Xe48598_X24139-RB_03-Flux.log")
+FMT <- c('Ant', 'AeX1', 'AeY1', 'AeX2', 'AeY2', 'AeX3', 'AeY3', 'AeX4', 'AeY4', 'Band', 'calibrator', 'EL', 'Date', 'sunset')
 AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 for(fileName in fileList){
 	cat(fileName); cat('\n')
@@ -43,6 +46,9 @@ for(fileName in fileList){
 	CalList <- findCalibrator(fileLines)
     if(CalList[[1]] == -1){ next }
 	DF <- readAeffSection(fileLines)
+	DF$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
+	DF$calibrator <- CalList$calibrator
+	DF$EL <- CalList$EL
 	DF$Date <- CalList$UTC
 	DF$sunset <- CalList$sunset
 	DF$File <- fileName
