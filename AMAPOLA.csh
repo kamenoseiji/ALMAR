@@ -12,6 +12,6 @@ scp amapola.txt skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
 Rscript ../PlotFlux.R
 scp PolQuery.CSV skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
 scp *.html skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
-scp *.pdf skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
-scp *.table skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
+scp *.pdf skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/PDF/
+scp *.table skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/Table/
 cd ..
