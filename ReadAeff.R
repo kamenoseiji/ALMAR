@@ -1,6 +1,35 @@
 library(suncalc)
+library(scales)
 ALMA_POS <- matrix(c( -67.755, -23.029 ), nrow=1 )
 SSOlist = c('Uranus', 'Neptune', 'Callisto', 'Ganymede', 'Titan', 'Io', 'Europa', 'Ceres', 'Pallas', 'Vesta', 'Juno', 'Mars', 'Mercury', 'Venus')
+#-------- Constants for time/date system
+MJD_1901 <- 15384		# MJD at Y1901
+DAY_PER_YEAR <- 365
+DAY_PER_4YEAR <- 1461
+SEC_PER_DAY <- 86400
+DOY_MON <- c(0, 31, 59, 90, 120, 151, 181, 212, 242, 273, 303, 334)				# DOY at the 1st day of month
+DOY_MON_LEAP <- c(0, 31, 60, 91, 121, 152, 182, 213, 243, 274, 304, 335)		# DOY at the 1st day of monthe (for leap year)
+#-------- Calculate (fractional) Modified Julian Date in unit of second. This unit is used in CASA
+doy2mjdSec <- function(year, doy, hour, min, sec){
+	if((year < 1901) || (year > 2099)){ return(-1)}
+	year <- year - 1901
+	mjd <- year %/%4 * DAY_PER_4YEAR + year%%4 * DAY_PER_YEAR + doy + MJD_1901
+	sod <- (hour*60 + min)*60 + sec
+	return(mjd* SEC_PER_DAY + sod)
+}
+
+#-------- Convert Time String (JST) into MJD in second
+timeString2MJD <- function( timeString ){
+	year <- as.integer(substring(timeString, 1, 4))
+	month <- as.integer(substring(timeString, 5, 6))
+	day <- as.integer(substring(timeString, 7, 8))
+	ut_hour <- as.integer(substring(timeString, 9, 10))
+	minute <- as.integer(substring(timeString, 11, 12))
+	second <- as.integer(substring(timeString, 13, 14))
+	return(doy2mjdSec(year, md2doy(year, month, day), ut_hour, minute, second))
+}
+
+
 #-------- Parse arguments
 parseArg <- function( args ){
     fileDF <- read.table(args[1])
@@ -79,6 +108,56 @@ readDtermSection <- function(Lines){
     names(DF) <- FMT
 	return(DF)
 }    
+#-------- Ae correction
+AeCorrect <- function(DF, band=3, thresh=10){
+    bandDF <- DF[DF$Band == band,]  # band selection
+    bandDF <- bandDF[((abs(bandDF$AeX - median(bandDF$AeX)) < thresh) & (abs(bandDF$AeY - median(bandDF$AeY)) < thresh)),]  # Filter irregular Aeff
+    bandDF$Ae <- 0.5* (bandDF$AeX + bandDF$AeY) # combine polarization
+    bandDF$sunsetArg <- sinpi((bandDF$sunset + 4.5)/12.0)   # phase since sunset+4.5h
+    bandDF$EL45 <- bandDF$EL - 45.0                         # EL reference of 45 deg
+    fit <- lm(formula = Ae ~ EL45 + sunsetArg, data=bandDF)   # regression for EL and sunset phase
+    AeC <- coef(fit)['EL45'][[1]]* bandDF$EL45 + coef(fit)['sunsetArg'][[1]]* bandDF$sunsetArg  # correction factor
+    bandDF$AeC <- bandDF$Ae - AeC       # apply correction
+    bandDF$AeX <- bandDF$AeX - AeC      # apply correction
+    bandDF$AeY <- bandDF$AeY - AeC      # apply correction
+    #-------- correction for different calibrator
+    AeRef <- median(bandDF$AeC)
+    AeC <- rep(1.0, length(SSOlist))
+    names(AeC) <- SSOlist
+    for(SSO in SSOlist){
+        calDF <- bandDF[bandDF$calibrator == SSO,]
+        if(nrow(calDF) < 10){ next }
+        AeC[SSO] <- AeRef / median(calDF$AeC)   # correction factor for each calibrator
+        text_sd <- sprintf('%10s  : %.2f (%.2f)\n', SSO, median(calDF$AeC), sd(calDF$AeC))
+        cat(text_sd)
+        bandDF[bandDF$calibrator == SSO,]$AeC <- bandDF[bandDF$calibrator == SSO,]$AeC * AeC[SSO]
+        bandDF[bandDF$calibrator == SSO,]$AeX <- bandDF[bandDF$calibrator == SSO,]$AeX * AeC[SSO]
+        bandDF[bandDF$calibrator == SSO,]$AeY <- bandDF[bandDF$calibrator == SSO,]$AeY * AeC[SSO]
+    }
+    bandDF$AeR <- bandDF$AeY / bandDF$AeX
+    bandDF$Ae  <- 0.5*(bandDF$AeY + bandDF$AeX)
+    return( bandDF )
+}
+#-------- Monthly smoothing
+SPL_period <- function(DF, refPeriod){
+    # DF <- data.frame(secSinceRefTIme, Value)
+    # refPeriod <- secSinceRefTime to output
+    Cadence <- 2* max(diff(refPeriod))
+    refTime <- max(refPeriod)
+    relSec <- c(min(refPeriod)-Cadence, DF[[1]], refTime+Cadence)
+    Value  <- c(median(DF[[2]]), DF[[2]], median(DF[[2]]))
+    NumKnots <- round(diff(range(relSec)) / max(diff(relSec)))
+    #if(length(Value) < 10){
+    if(NumKnots < 4){
+        return( data.frame(Date=refPeriod, Value=median(Value) ))
+    }
+    if(length(Value) > 2*NumKnots){
+        SPL <- smooth.spline(relSec, Value, all.knots=F, nknots=NumKnots)
+    } else {
+        SPL <- smooth.spline(relSec, Value, all.knots=F, spar=0.5)
+    }
+    return( data.frame(Date=refPeriod, Value=predict(SPL, refPeriod)$y ))
+}
 #-------- Start program
 #Arguments <- commandArgs(trailingOnly = T)
 #fileList <- parseArg(Arguments)
@@ -113,5 +192,65 @@ for(fileName in fileList){
 	    DtermDF <- rbind(DtermDF, Ddf)
     }
 }
+AeDF <- AeDF[order(AeDF$Date), ]
+DtermDF <- DtermDF[order(DtermDF$Date), ]
 save(AeDF, file='AeDF.Rdata')
 save(DtermDF, file='Dterm.Rdata')
+#-------- Ae table
+BandList <- c(3, 6, 7)
+pcolors <- c(alpha('orange', 0.5), alpha('purple', 0.5))
+lcolors <- c('orange', 'purple')
+#refTime <- Sys.time()
+refTime <- max(AeDF$Date)
+MonthSec <- 2629744
+refPeriod <- seq(as.numeric(difftime(min(AeDF$Date), refTime, units='sec')), MonthSec, by=MonthSec)
+for(Band in BandList){
+    BandAeDF <- AeCorrect(AeDF, Band, 10)
+    antList <- sort(as.character(unique(BandAeDF$Ant)))
+    bandAeDF <- data.frame(Date = as.Date(refTime + refPeriod))
+    for(ant in antList){
+        BandAntAeDF <- BandAeDF[BandAeDF$Ant == ant,]
+        Ae  <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntAeDF$Date, refTime, units='sec')), Value=BandAntAeDF$Ae), refPeriod)
+        XYR <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntAeDF$Date, refTime, units='sec')), Value=BandAntAeDF$AeR), refPeriod)
+        bandAeDF[[paste(ant , '-X', sep='')]] <- Ae$Value / sqrt(XYR$Value)
+        bandAeDF[[paste(ant , '-Y', sep='')]] <- Ae$Value * sqrt(XYR$Value)
+        pdf(sprintf('Ae-%s-B%d.pdf', ant, Band))
+        plot(BandAeDF$Date, BandAeDF$Ae, type='n', ylim=c(0, 100), xlab='Date', ylab='Aeff (%)', main=sprintf('%s Band%d', ant, Band))
+        lines(Ae$Date + refTime, Ae$Value / sqrt(XYR$Value), col=lcolors[1], lwd=2)
+        lines(Ae$Date + refTime, Ae$Value * sqrt(XYR$Value), col=lcolors[2], lwd=2)
+        points(BandAntAeDF$Date, BandAntAeDF$Ae / sqrt(BandAntAeDF$AeR), pch=20, cex=0.5, col=pcolors[1])
+        points(BandAntAeDF$Date, BandAntAeDF$Ae * sqrt(BandAntAeDF$AeR), pch=20, cex=0.5, col=pcolors[2])
+        legend("bottomleft", legend=c('Pol-X', 'Pol-Y'), col=lcolors, pch=rep(20, 2), lty=rep(1,2))
+        dev.off()
+    }
+    write.table(format(bandAeDF, digits=4), file=sprintf('AeB%d.table', Band), quote=F, row.names=F)
+}
+#-------- Dterm table
+#refTime <- Sys.time()
+refTime <- max(DtermDF$Date)
+refPeriod <- seq(as.numeric(difftime(min(DtermDF$Date), refTime, units='sec')), MonthSec, by=MonthSec)
+for(Band in BandList){
+    BandDdf <- DtermDF[DtermDF$Band == Band,]
+    antList <- sort(as.character(unique(BandAeDF$Ant)))
+    for(ant in antList){
+        BandAntdDF <- BandDdf[BandDdf$Ant == ant,]
+        bandAntDdf <- data.frame(Date = as.Date(refTime + refPeriod))
+        if(nrow(BandAntdDF) < 3){
+            for(BB in c(1,2,3,4)){
+                for(pol in c('x','y')){
+                    bandAntDdf[[sprintf('%s-BB%d-D%s', ant, BB, pol)]] <- (0.0 + 0.0i)
+                }
+            }
+        } else {
+            for(BB in c(1,2,3,4)){
+                for(pol in c('x','y')){
+                    colName <- sprintf('D%s%d', pol, BB)
+                    ReD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Re(BandAntdDF[[colName]])), refPeriod)
+                    ImD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Im(BandAntdDF[[colName]])), refPeriod)
+                    bandAntDdf[[sprintf('%s-BB%d-D%s', ant, BB, pol)]] <- ReD$Value + (0 + 1i)* ImD$Value
+                }
+            }
+        }
+        write.table(format(bandAntDdf, digits=6), file=sprintf('DtermB%d.%s.table', Band, ant), quote=F, row.names=F)
+    }
+}
