@@ -2,34 +2,6 @@ library(suncalc)
 library(scales)
 ALMA_POS <- matrix(c( -67.755, -23.029 ), nrow=1 )
 SSOlist = c('Uranus', 'Neptune', 'Callisto', 'Ganymede', 'Titan', 'Io', 'Europa', 'Ceres', 'Pallas', 'Vesta', 'Juno', 'Mars', 'Mercury', 'Venus')
-#-------- Constants for time/date system
-MJD_1901 <- 15384		# MJD at Y1901
-DAY_PER_YEAR <- 365
-DAY_PER_4YEAR <- 1461
-SEC_PER_DAY <- 86400
-DOY_MON <- c(0, 31, 59, 90, 120, 151, 181, 212, 242, 273, 303, 334)				# DOY at the 1st day of month
-DOY_MON_LEAP <- c(0, 31, 60, 91, 121, 152, 182, 213, 243, 274, 304, 335)		# DOY at the 1st day of monthe (for leap year)
-#-------- Calculate (fractional) Modified Julian Date in unit of second. This unit is used in CASA
-doy2mjdSec <- function(year, doy, hour, min, sec){
-	if((year < 1901) || (year > 2099)){ return(-1)}
-	year <- year - 1901
-	mjd <- year %/%4 * DAY_PER_4YEAR + year%%4 * DAY_PER_YEAR + doy + MJD_1901
-	sod <- (hour*60 + min)*60 + sec
-	return(mjd* SEC_PER_DAY + sod)
-}
-
-#-------- Convert Time String (JST) into MJD in second
-timeString2MJD <- function( timeString ){
-	year <- as.integer(substring(timeString, 1, 4))
-	month <- as.integer(substring(timeString, 5, 6))
-	day <- as.integer(substring(timeString, 7, 8))
-	ut_hour <- as.integer(substring(timeString, 9, 10))
-	minute <- as.integer(substring(timeString, 11, 12))
-	second <- as.integer(substring(timeString, 13, 14))
-	return(doy2mjdSec(year, md2doy(year, month, day), ut_hour, minute, second))
-}
-
-
 #-------- Parse arguments
 parseArg <- function( args ){
     fileDF <- read.table(args[1])
@@ -207,13 +179,15 @@ refPeriod <- seq(as.numeric(difftime(min(AeDF$Date), refTime, units='sec')), Mon
 for(Band in BandList){
     BandAeDF <- AeCorrect(AeDF, Band, 10)
     antList <- sort(as.character(unique(BandAeDF$Ant)))
-    bandAeDF <- data.frame(Date = as.Date(refTime + refPeriod))
+    bandAeDF <- data.frame(Date = c('mean', 'sd', as.character(as.Date(refTime + refPeriod))))
     for(ant in antList){
         BandAntAeDF <- BandAeDF[BandAeDF$Ant == ant,]
         Ae  <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntAeDF$Date, refTime, units='sec')), Value=BandAntAeDF$Ae), refPeriod)
         XYR <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntAeDF$Date, refTime, units='sec')), Value=BandAntAeDF$AeR), refPeriod)
-        bandAeDF[[paste(ant , '-X', sep='')]] <- Ae$Value / sqrt(XYR$Value)
-        bandAeDF[[paste(ant , '-Y', sep='')]] <- Ae$Value * sqrt(XYR$Value)
+        AeX <- Ae$Value / sqrt(XYR$Value)
+        AeY <- Ae$Value * sqrt(XYR$Value) 
+        bandAeDF[[paste(ant , '-X', sep='')]] <- c(mean(BandAntAeDF$AeC / sqrt(BandAntAeDF$AeR)), sd(BandAntAeDF$AeC / sqrt(BandAntAeDF$AeR)), AeX)
+        bandAeDF[[paste(ant , '-Y', sep='')]] <- c(mean(BandAntAeDF$AeC * sqrt(BandAntAeDF$AeR)), sd(BandAntAeDF$AeC * sqrt(BandAntAeDF$AeR)), AeY)
         pdf(sprintf('Ae-%s-B%d.pdf', ant, Band))
         plot(BandAeDF$Date, BandAeDF$Ae, type='n', ylim=c(0, 100), xlab='Date', ylab='Aeff (%)', main=sprintf('%s Band%d', ant, Band))
         lines(Ae$Date + refTime, Ae$Value / sqrt(XYR$Value), col=lcolors[1], lwd=2)
