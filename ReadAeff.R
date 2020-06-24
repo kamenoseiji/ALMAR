@@ -227,4 +227,18 @@ for(Band in BandList){
         }
         write.table(format(bandAntDdf, digits=6), file=sprintf('DtermB%d.%s.table', Band, ant), quote=F, row.names=F)
     }
+    #---- Dummy antenna
+    for(ant in c('CM', 'PM', 'DA', 'DV')){
+        BandAntdDF <- subset(BandDdf, grepl(ant,  BandDdf$Ant))
+        bandAntDdf <- data.frame(Date = as.Date(refTime + refPeriod))
+        for(BB in c(1,2,3,4)){
+            for(pol in c('x','y')){
+                colName <- sprintf('D%s%d', pol, BB)
+                ReD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Re(BandAntdDF[[colName]])), refPeriod)
+                ImD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Im(BandAntdDF[[colName]])), refPeriod)
+                bandAntDdf[[sprintf('%s00-BB%d-D%s', ant, BB, pol)]] <- ReD$Value + (0 + 1i)* ImD$Value
+            }
+        }
+        write.table(format(bandAntDdf, digits=6), file=sprintf('DtermB%d.%s00.table', Band, ant), quote=F, row.names=F)
+    }
 }
