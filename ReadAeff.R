@@ -239,8 +239,8 @@ for(Band in BandList){
         for(BB in c(1,2,3,4)){
             for(pol in c('x','y')){
                 colName <- sprintf('D%s%d', pol, BB)
-                ReD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Re(BandAntdDF[[colName]])), refPeriod)
-                ImD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Im(BandAntdDF[[colName]])), refPeriod)
+                ReD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Re(BandAntdDF[[colName]])), refPeriod, 1.0/(abs(BandAntdDF[[colName]])+0.001))
+                ImD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Im(BandAntdDF[[colName]])), refPeriod, 1.0/(abs(BandAntdDF[[colName]])+0.001))
                 bandAntDdf[[sprintf('%s00-BB%d-D%s', ant, BB, pol)]] <- ReD$Value + (0 + 1i)* ImD$Value
             }
         }
