@@ -111,29 +111,34 @@ AeCorrect <- function(DF, band=3, thresh=10){
     return( bandDF )
 }
 #-------- Monthly smoothing
-SPL_period <- function(DF, refPeriod){
+SPL_period <- function(DF, refPeriod, weight=c(0,0)){
     # DF <- data.frame(secSinceRefTIme, Value)
     # refPeriod <- secSinceRefTime to output
     Cadence <- 2* max(diff(refPeriod))
     refTime <- max(refPeriod)
     relSec <- c(min(refPeriod)-Cadence, DF[[1]], refTime+Cadence)
     Value  <- c(median(DF[[2]]), DF[[2]], median(DF[[2]]))
+    if(mean(weight) == 0){
+        weight <- rep(1.0, length(Value))
+    } else {
+        weight <- c(1.0, weight, 1.0)
+    }
     NumKnots <- round(diff(range(relSec)) / max(diff(relSec)))
     #if(length(Value) < 10){
     if(NumKnots < 4){
         return( data.frame(Date=refPeriod, Value=median(Value) ))
     }
     if(length(Value) > 2*NumKnots){
-        SPL <- smooth.spline(relSec, Value, all.knots=F, nknots=NumKnots)
+        SPL <- smooth.spline(relSec, Value, all.knots=F, nknots=NumKnots, w=weight)
     } else {
-        SPL <- smooth.spline(relSec, Value, all.knots=F, spar=0.5)
+        SPL <- smooth.spline(relSec, Value, all.knots=F, spar=0.5, w=weight)
     }
     return( data.frame(Date=refPeriod, Value=predict(SPL, refPeriod)$y ))
 }
 #-------- Start program
-Arguments <- commandArgs(trailingOnly = T)
-fileList <- parseArg(Arguments)
-#fileList <- parseArg('fileList')
+#Arguments <- commandArgs(trailingOnly = T)
+#fileList <- parseArg(Arguments)
+fileList <- parseArg('fileList')
 FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'fluxR')
 AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4')
@@ -219,8 +224,8 @@ for(Band in BandList){
             for(BB in c(1,2,3,4)){
                 for(pol in c('x','y')){
                     colName <- sprintf('D%s%d', pol, BB)
-                    ReD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Re(BandAntdDF[[colName]])), refPeriod)
-                    ImD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Im(BandAntdDF[[colName]])), refPeriod)
+                    ReD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Re(BandAntdDF[[colName]])), refPeriod, 1.0/(abs(BandAntdDF[[colName]])+0.001))
+                    ImD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Im(BandAntdDF[[colName]])), refPeriod, 1.0/(abs(BandAntdDF[[colName]])+0.001))
                     bandAntDdf[[sprintf('%s-BB%d-D%s', ant, BB, pol)]] <- ReD$Value + (0 + 1i)* ImD$Value
                 }
             }
