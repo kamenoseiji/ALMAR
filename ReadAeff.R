@@ -216,7 +216,6 @@ for(Band in BandList){
         pdf(sprintf('Dterm.B%d.%s.pdf', Band, ant), width=8, height=11)
         par.old <- par(no.readonly=TRUE)
         par(mfrow=c(4,2), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
-        mtext(side = 3, line=1, outer=T, text = sprintf('D-term %s Band-%d', ant, Band), cex=2)
         column_index <- 1
         for(BB in c(1,2,3,4)){
             for(pol in c('x','y')){
@@ -226,6 +225,7 @@ for(Band in BandList){
                 legend("bottomleft", legend=c('Real', 'Imag'), col=lcolors, pch=rep(20, 2), lty=rep(1,2))
             }
         }
+        mtext(side = 3, line=1, outer=T, text = sprintf('D-term %s Band-%d', ant, Band), cex=2)
         par(par.old)
         dev.off()
         if(nrow(BandAntdDF) < 3){
