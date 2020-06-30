@@ -136,9 +136,9 @@ SPL_period <- function(DF, refPeriod, weight=c(0,0)){
     return( data.frame(Date=refPeriod, Value=predict(SPL, refPeriod)$y ))
 }
 #-------- Start program
-#Arguments <- commandArgs(trailingOnly = T)
-#fileList <- parseArg(Arguments)
-fileList <- parseArg('fileList')
+Arguments <- commandArgs(trailingOnly = T)
+fileList <- parseArg(Arguments)
+#fileList <- parseArg('fileList')
 FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'fluxR')
 AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4')
