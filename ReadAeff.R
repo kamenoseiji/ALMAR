@@ -231,10 +231,10 @@ for(Band in BandList){
                     bandAntDdf[[sprintf('%s-BB%d-D%s', ant, BB, pol)]] <- ReD$Value + (0 + 1i)* ImD$Value
                     #---- plot
                     column_index <- column_index + 1
-                    plot(BandAntdDF$Date, Re(BandAntdDF[[column_index]]), pch=21, cex=0.2, ylim=c(-0.1, 0.1), xlab='Date', ylab='D-term', main=colnames(BandAntdDF[column_index]), col=pcolors[1] )
-                    points(BandAntdDF$Date, Im(BandAntdDF[[column_index]]), pch=21, cex=0.2, col=pcolors[2] )
-                    lines(bandAntDdf[[1]], Re(bandAntDdf[[column_index]]), col=lcolors[1], lwd=2)
-                    lines(bandAntDdf[[1]], Im(bandAntDdf[[column_index]]), col=lcolors[2], lwd=2)
+                    plot(as.Date(BandAntdDF$Date), Re(BandAntdDF[[column_index]]), pch=21, cex=0.2, ylim=c(-0.1, 0.1), xlab='Date', ylab='D-term', main=colnames(BandAntdDF[column_index]), col=pcolors[1] )
+                    points(as.Date(BandAntdDF$Date), Im(BandAntdDF[[column_index]]), pch=21, cex=0.2, col=pcolors[2] )
+                    lines(as.Date(bandAntDdf[[1]]), Re(bandAntDdf[[column_index]]), col=lcolors[1], lwd=2)
+                    lines(as.Date(bandAntDdf[[1]]), Im(bandAntDdf[[column_index]]), col=lcolors[2], lwd=2)
                     legend("bottomleft", legend=c('Real', 'Imag'), col=lcolors, pch=rep(20, 2), lty=rep(1,2))
                 }
             }
