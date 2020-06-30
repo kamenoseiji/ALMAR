@@ -100,7 +100,7 @@ AeCorrect <- function(DF, band=3, thresh=10){
         calDF <- bandDF[bandDF$calibrator == SSO,]
         if(nrow(calDF) < 10){ next }
         AeC[SSO] <- AeRef / median(calDF$AeC)   # correction factor for each calibrator
-        text_sd <- sprintf('%10s  : %.2f (%.2f)\n', SSO, median(calDF$AeC), sd(calDF$AeC))
+        text_sd <- sprintf('%10s  : %.3f (%.3f)\n', SSO, median(calDF$AeC), sd(calDF$AeC))
         cat(text_sd)
         bandDF[bandDF$calibrator == SSO,]$AeC <- bandDF[bandDF$calibrator == SSO,]$AeC * AeC[SSO]
         bandDF[bandDF$calibrator == SSO,]$AeX <- bandDF[bandDF$calibrator == SSO,]$AeX * AeC[SSO]
@@ -108,6 +108,7 @@ AeCorrect <- function(DF, band=3, thresh=10){
     }
     bandDF$AeR <- bandDF$AeY / bandDF$AeX
     bandDF$Ae  <- 0.5*(bandDF$AeY + bandDF$AeX)
+    write.table(data.frame(AeC), quote=F, col.names=F, sep=',', file=sprintf('SSO.B%d.table', band))
     return( bandDF )
 }
 #-------- Monthly smoothing
@@ -136,9 +137,9 @@ SPL_period <- function(DF, refPeriod, weight=c(0,0)){
     return( data.frame(Date=refPeriod, Value=predict(SPL, refPeriod)$y ))
 }
 #-------- Start program
-Arguments <- commandArgs(trailingOnly = T)
-fileList <- parseArg(Arguments)
-#fileList <- parseArg('fileList')
+#Arguments <- commandArgs(trailingOnly = T)
+#fileList <- parseArg(Arguments)
+fileList <- parseArg('fileList')
 FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'fluxR')
 AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4')
@@ -208,7 +209,7 @@ refTime <- max(DtermDF$Date)
 refPeriod <- seq(as.numeric(difftime(min(DtermDF$Date), refTime, units='sec')), MonthSec, by=MonthSec)
 for(Band in BandList){
     BandDdf <- DtermDF[DtermDF$Band == Band,]
-    antList <- sort(as.character(unique(BandAeDF$Ant)))
+    antList <- sort(as.character(unique(BandDdf$Ant)))
     for(ant in antList){
         BandAntdDF <- BandDdf[BandDdf$Ant == ant,]
         bandAntDdf <- data.frame(Date = as.Date(refTime + refPeriod))
