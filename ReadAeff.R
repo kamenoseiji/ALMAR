@@ -212,22 +212,6 @@ for(Band in BandList){
     for(ant in antList){
         BandAntdDF <- BandDdf[BandDdf$Ant == ant,]
         bandAntDdf <- data.frame(Date = as.Date(refTime + refPeriod))
-        #---- plot
-        pdf(sprintf('Dterm.B%d.%s.pdf', Band, ant), width=8, height=11)
-        par.old <- par(no.readonly=TRUE)
-        par(mfrow=c(4,2), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
-        column_index <- 1
-        for(BB in c(1,2,3,4)){
-            for(pol in c('x','y')){
-                column_index <- column_index + 1
-                plot(BandAntdDF$Date, Re(BandAntdDF[[column_index]]), pch=21, cex=0.2, ylim=c(-0.1, 0.1), xlab='Date', ylab='D-term', main=colnames(BandAntdDF[column_index]), col=pcolors[1] )
-                points(BandAntdDF$Date, Im(BandAntdDF[[column_index]]), pch=21, cex=0.2, col=pcolors[2] )
-                legend("bottomleft", legend=c('Real', 'Imag'), col=lcolors, pch=rep(20, 2), lty=rep(1,2))
-            }
-        }
-        mtext(side = 3, line=1, outer=T, text = sprintf('D-term %s Band-%d', ant, Band), cex=2)
-        par(par.old)
-        dev.off()
         if(nrow(BandAntdDF) < 3){
             for(BB in c(1,2,3,4)){
                 for(pol in c('x','y')){
@@ -235,14 +219,28 @@ for(Band in BandList){
                 }
             }
         } else {
+            pdf(sprintf('Dterm.B%d.%s.pdf', Band, ant), width=8, height=11)
+            par.old <- par(no.readonly=TRUE)
+            par(mfrow=c(4,2), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
+            column_index <- 1
             for(BB in c(1,2,3,4)){
                 for(pol in c('x','y')){
                     colName <- sprintf('D%s%d', pol, BB)
                     ReD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Re(BandAntdDF[[colName]])), refPeriod, 1.0/(abs(BandAntdDF[[colName]])+0.001))
                     ImD <- SPL_period(data.frame(relSec=as.numeric(difftime(BandAntdDF$Date, refTime, units='sec')), Value=Im(BandAntdDF[[colName]])), refPeriod, 1.0/(abs(BandAntdDF[[colName]])+0.001))
                     bandAntDdf[[sprintf('%s-BB%d-D%s', ant, BB, pol)]] <- ReD$Value + (0 + 1i)* ImD$Value
+                    #---- plot
+                    column_index <- column_index + 1
+                    plot(BandAntdDF$Date, Re(BandAntdDF[[column_index]]), pch=21, cex=0.2, ylim=c(-0.1, 0.1), xlab='Date', ylab='D-term', main=colnames(BandAntdDF[column_index]), col=pcolors[1] )
+                    points(BandAntdDF$Date, Im(BandAntdDF[[column_index]]), pch=21, cex=0.2, col=pcolors[2] )
+                    lines(bandAntDdf[[1]], Re(bandAntDdf[[column_index]]), col=lcolors[1], lwd=2)
+                    lines(bandAntDdf[[1]], Im(bandAntDdf[[column_index]]), col=lcolors[2], lwd=2)
+                    legend("bottomleft", legend=c('Real', 'Imag'), col=lcolors, pch=rep(20, 2), lty=rep(1,2))
                 }
             }
+            mtext(side = 3, line=1, outer=T, text = sprintf('D-term %s Band-%d', ant, Band), cex=2)
+            par(par.old)
+            dev.off()
         }
         write.table(format(bandAntDdf, digits=6), file=sprintf('DtermB%d.%s.table', Band, ant), quote=F, row.names=F)
     }
