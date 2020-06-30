@@ -177,7 +177,6 @@ save(DtermDF, file='Dterm.Rdata')
 BandList <- c(3, 6, 7)
 pcolors <- c(alpha('orange', 0.5), alpha('purple', 0.5))
 lcolors <- c('orange', 'purple')
-#refTime <- Sys.time()
 refTime <- max(AeDF$Date)
 MonthSec <- 2629744
 refPeriod <- seq(as.numeric(difftime(min(AeDF$Date), refTime, units='sec')), MonthSec, by=MonthSec)
@@ -205,7 +204,6 @@ for(Band in BandList){
     write.table(format(bandAeDF, digits=4), file=sprintf('AeB%d.table', Band), quote=F, row.names=F)
 }
 #-------- Dterm table
-#refTime <- Sys.time()
 refTime <- max(DtermDF$Date)
 refPeriod <- seq(as.numeric(difftime(min(DtermDF$Date), refTime, units='sec')), MonthSec, by=MonthSec)
 for(Band in BandList){
@@ -214,6 +212,22 @@ for(Band in BandList){
     for(ant in antList){
         BandAntdDF <- BandDdf[BandDdf$Ant == ant,]
         bandAntDdf <- data.frame(Date = as.Date(refTime + refPeriod))
+        #---- plot
+        pdf(sprintf('Dterm.B%d.%s.pdf', Band, ant), width=8, height=11)
+        par.old <- par(no.readonly=TRUE)
+        par(mfrow=c(4,2), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
+        mtext(side = 3, line=1, outer=T, text = sprintf('D-term %s Band-%d', ant, Band), cex=2)
+        column_index <- 1
+        for(BB in c(1,2,3,4)){
+            for(pol in c('x','y')){
+                column_index <- column_index + 1
+                plot(BandAntdDF$Date, Re(BandAntdDF[[column_index]]), pch=21, cex=0.2, ylim=c(-0.1, 0.1), xlab='Date', ylab='D-term', main=colnames(BandAntdDF[column_index]), col=pcolors[1] )
+                points(BandAntdDF$Date, Im(BandAntdDF[[column_index]]), pch=21, cex=0.2, col=pcolors[2] )
+                legend("bottomleft", legend=c('Real', 'Imag'), col=lcolors, pch=rep(20, 2), lty=rep(1,2))
+            }
+        }
+        par(par.old)
+        dev.off()
         if(nrow(BandAntdDF) < 3){
             for(BB in c(1,2,3,4)){
                 for(pol in c('x','y')){
