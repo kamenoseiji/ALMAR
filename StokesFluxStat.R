@@ -34,7 +34,9 @@ sourceMatch <- function(sourceName){
 		c('J2148+0657', 'J2148+069'),
 		c('J2232+1143', 'J2232+117'),
 		c('J2253+1608', '3c454.3'),
-		c('J2258-2758', 'J2258-279'))
+		c('J2258-2758', 'J2258-279'),
+		c('J0457+2624', 'J0457+2624_ALMA'),
+		c('Uranus', 'Uranus_1'))
 	#
 	for(index in 1:length(sourceDict)){ if( !is.na(match(sourceName, sourceDict[[index]]))){ return(sourceDict[[index]][1])} }
 	return(sourceName)
@@ -182,16 +184,17 @@ for(fileName in fileList){
 	DF$File <- fileName
 	FLDF <- rbind(FLDF, na.omit(DF))
 }
-#save(FLDF, file='Flux.Rdata')
+#-------- Filter impossible records out
+FLDF <- FLDF[((FLDF$I > FLDF$eI) & (FLDF$eI < 1.0)),]       # too large error
+FLDF <- FLDF[FLDF$I^2  > FLDF$Q^2 + FLDF$U^2 +  FLDF$V^2,]  # polarization degree
+#-------- 
 FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
 FLDF$eI <- sqrt(FLDF$eI^2 + (sysIerr*FLDF$I)^2)
 FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
-#sigmaSQ <- sqrt(FLDF$eQ* FLDF$eU)
 sigmaSQ <- sqrt(FLDF$eQ * FLDF$eU + (FLDF$I* sysPerr)^2)
 FLDF$eP_lower <- qrice(0.15, sigmaSQ, FLDF$P)
 FLDF[FLDF$P < sigmaSQ,]$eP_lower <- 0.0
 FLDF$eP_upper <- qrice(0.85, sigmaSQ, FLDF$P)
-# FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
 FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P)^2
 FLDF$Date <- as.POSIXlt(FLDF$Date, tz="GMT")
@@ -203,7 +206,6 @@ TextDF <- TextDF[-index,]
 TextDF$Src <- sprintf('%10s ', TextDF$Src)
 write.table(format(TextDF, digits=4), 'amapola.txt', sep='\t', quote=F, col.names=T, row.names=F)
 #
-BandName <- sprintf('Band-%d', as.numeric(strsplit(FLDF$File[1], '[-|.|_]')[[1]][8]))
 #-------- Source List
 sourceList <- unique(FLDF$Src)
 numSrc <- length(sourceList)
@@ -225,32 +227,44 @@ save(polDF, file='Pol.Rdata')
 
 sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
 #-------- Plot time-seried flux densities
-pdf(sprintf('Flux-%s.pdf', BandName), width=8, height=11)
+pdf('AMAPOLA.pdf', width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
 cat('Source     I [Jy]   Q [Jy]   U [Jy]   %Pol   EVPA [deg]\n')
-for(source in sourceList){
-	DF <- FLDF[FLDF$Src == source,]
-	pDF <- polDF[polDF$Src == source,]
+labels <- c("B3LSB",     "B3USB",     "B4",        "B6",        "B7",        ">B8")
+colors <- c("#FF00003F", "#C040003F", "#40C0003F", "#0080803F", "#0000FF3F", "#FFFFFF3F")
+threshU <-c(97.5,        120.0,       200.0,       280.0,       380.0,       700.0)
+threshL <-c(80.0,        97.5 ,       120.0,       200.0,       280.0,       380.0)
+for(sourceName in sourceList){
+	DF <- FLDF[FLDF$Src == sourceName,]
+	pDF <- polDF[polDF$Src == sourceName,]
 	cat(sprintf("%10s %6.2f %6.2f %6.2f %6.2f %6.2f\n", pDF$Src, pDF$I, pDF$Q, pDF$U, pDF$p, pDF$EVPA))
+    #-------- Coloring by frequency
+    DF$color_vector <- rep("#000000FF", nrow(DF))
+    for(color_index in 1:length(labels)){
+        band_index <- which( (DF$Freq > threshL[color_index]) & (DF$Freq < threshU[color_index]) )
+        DF$color_vector[band_index] <- colors[color_index]
+    }
 	#-------- Plot Stokes I
 	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', ylim=c(0, 1.2*max(DF$I)))
-	color_vector <- rep("#000000FF", length(DF$Date))
-	color_vector[which(DF$flagNum > 0)] <- "#0000FF3F"
-	arrows(as.numeric(DF$Date), DF$I - DF$eI, as.numeric(DF$Date), DF$I + DF$eI, angle=90, length=0.0, col=color_vector)
-	points(DF$Date, DF$I, pch=20, col=color_vector)
+	arrows(as.numeric(DF$Date), DF$I - DF$eI, as.numeric(DF$Date), DF$I + DF$eI, angle=90, length=0.0, col=DF$color_vector)
+	points(DF$Date, DF$I, pch=20, col=DF$color_vector)
+    legend("bottomleft", legend=labels, pch=20, col=colors)
+    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
 	
 	#-------- Plot polarized flux
 	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', ylim=c(0, 1.2* max(DF$P)))
-	arrows(as.numeric(DF$Date), DF$eP_lower, as.numeric(DF$Date), DF$eP_upper, angle=90, length=0.0, col=color_vector)
-	points(DF$Date, DF$P, pch=20, col=color_vector)
+	arrows(as.numeric(DF$Date), DF$eP_lower, as.numeric(DF$Date), DF$eP_upper, angle=90, length=0.0, col=DF$color_vector)
+	points(DF$Date, DF$P, pch=20, col=DF$color_vector)
+    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
 	
 	#-------- Plot EVPA
 	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', ylim=c(-90,90))
 	abline(h=90, lwd=0.1); abline(h=-90, lwd=0.1)
-	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=color_vector)
-	points(DF$Date, DF$EVPA*180/pi, pch=20, col=color_vector)
-	mtext(side = 3, line=1, outer=T, text = sprintf('%s %s', source, BandName), cex=2)
+	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=DF$color_vector)
+	points(DF$Date, DF$EVPA*180/pi, pch=20, col=DF$color_vector)
+    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
+	mtext(side = 3, line=1, outer=T, text = sourceName, cex=2)
 }
 par(par.old)
 dev.off()
