@@ -236,7 +236,7 @@ labels <- c("B3LSB",     "B3USB",     "B4",        "B6",        "B7",        "> 
 colors <- c("#FF00003F", "#C040003F", "#8080003F", "#00C0803F", "#0000FF3F", "#FFFFFF")
 threshU <-c(97.5,        120.0,       200.0,       280.0,       380.0,       700.0)
 threshL <-c(80.0,        97.5 ,       120.0,       200.0,       280.0,       380.0)
-plotXrange <- c(min(FLDF$Date), max(FLDF$Date))
+plotXrange <- c(min(as.Date(FLDF$Date)), max(as.Date(FLDF$Date)))
 for(sourceName in sourceList){
 	DF <- FLDF[FLDF$Src == sourceName,]
 	pDF <- polDF[polDF$Src == sourceName,]
