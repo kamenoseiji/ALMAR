@@ -236,7 +236,7 @@ labels <- c("B3LSB",     "B3USB",     "B4",        "B6",        "B7",        "> 
 colors <- c("#FF00003F", "#C040003F", "#8080003F", "#00C0803F", "#0000FF3F", "#FFFFFF")
 threshU <-c(97.5,        120.0,       200.0,       280.0,       380.0,       700.0)
 threshL <-c(80.0,        97.5 ,       120.0,       200.0,       280.0,       380.0)
-plotXrange <- c(min(as.Date(FLDF$Date)), max(as.Date(FLDF$Date)))
+plotXrange <- range(FLDF$Date)
 for(sourceName in sourceList){
 	DF <- FLDF[FLDF$Src == sourceName,]
 	pDF <- polDF[polDF$Src == sourceName,]
@@ -248,20 +248,20 @@ for(sourceName in sourceList){
         DF$color_vector[band_index] <- colors[color_index]
     }
 	#-------- Plot Stokes I
-	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', xlim=plotXrange, ylim=c(0, 1.2*max(DF$I)))
+	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', xlim=as.POSIXct(plotXrange), ylim=c(0, 1.2*max(DF$I)))
 	arrows(as.numeric(DF$Date), DF$I - DF$eI, as.numeric(DF$Date), DF$I + DF$eI, angle=90, length=0.0, col=DF$color_vector)
 	points(DF$Date, DF$I, pch=20, col=DF$color_vector)
     legend("bottomleft", legend=labels, pch=20, col=colors)
     axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
 	
 	#-------- Plot polarized flux
-	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', xlim=plotXrange, ylim=c(0, 1.2* max(DF$P)))
+	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', xlim=as.POSIXct(plotXrange), ylim=c(0, 1.2* max(DF$P)))
 	arrows(as.numeric(DF$Date), DF$eP_lower, as.numeric(DF$Date), DF$eP_upper, angle=90, length=0.0, col=DF$color_vector)
 	points(DF$Date, DF$P, pch=20, col=DF$color_vector)
     axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
 	
 	#-------- Plot EVPA
-	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', xlim=plotXrange, ylim=c(-90,90))
+	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', xlim=as.POSIXct(plotXrange), ylim=c(-90,90))
 	abline(h=90, lwd=0.1); abline(h=-90, lwd=0.1)
 	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=DF$color_vector)
 	points(DF$Date, DF$EVPA*180/pi, pch=20, col=DF$color_vector)
