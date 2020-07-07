@@ -5,11 +5,14 @@ sysPerr <- 0.003       # temporal polarization systematic error
 
 sourceMatch <- function(sourceName){
 	sourceDict <- list(
+		c('J0006-0623', 'J0006-063'),
+		c('J0006-0623', '0006-063'),
 		c('J0237+2848', 'J0237+288'),
 		c('J0238+1636', 'J0238+166'),
 		c('J0319+4130', '3c84'),
 		c('J0334-4008', 'J0334-401'),
 		c('J0423-0120', 'J0423-013'),
+		c('J0457+2624', 'J0457+2624_ALMA'),
 		c('J0510+1800', 'J0510+180'),
 		c('J0519-4546', 'J0519-454'),
 		c('J0522-3627', 'J0522-364'),
@@ -37,7 +40,6 @@ sourceMatch <- function(sourceName){
 		c('J2232+1143', 'J2232+117'),
 		c('J2253+1608', '3c454.3'),
 		c('J2258-2758', 'J2258-279'),
-		c('J0457+2624', 'J0457+2624_ALMA'),
 		c('Uranus', 'Uranus_1'))
 	#
 	for(index in 1:length(sourceDict)){ if( !is.na(match(sourceName, sourceDict[[index]]))){ return(sourceDict[[index]][1])} }
