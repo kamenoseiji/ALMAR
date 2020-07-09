@@ -60,6 +60,10 @@ readAeffSection <- function(Lines){
 }
 #-------- Read D-term Section
 readDtermSection <- function(Lines){
+    #---- Date
+	pointer <- grep("EL=", Lines)[1]
+    BP_UTC <- strptime(strsplit(Lines[pointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz="UTC")
+    #---- D-term
 	pointer <- grep("D-term", Lines)
     if(length(pointer) == 0){ return(-1)}
     spwLabel <- strsplit(Lines[pointer], '[ |:]+')[[1]]
@@ -67,13 +71,13 @@ readDtermSection <- function(Lines){
     spwLabel <- strsplit(Lines[pointer + 1], '[ |:]+')[[1]]
     spwList <- grep('[Dx|Dy]', spwLabel)
     pointer <- pointer + 2
-    FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4')
+    FMT <- c('Ant', 'Date', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
     while( is.na(strsplit(Lines[pointer], ' ')[[1]][1]) == F){
         Dline <- gsub('i', 'i ', Lines[pointer])
         Dvec  <- as.complex(strsplit(Dline, ' +')[[1]][spwList])
-        tmpDF <- data.frame(Ant = strsplit(Dline, ' +')[[1]][1])
-        tmpDF[1,2:9] <- Dvec
+        tmpDF <- data.frame(Ant = strsplit(Dline, ' +')[[1]][1], Date=BP_UTC)
+        tmpDF[1,3:10] <- Dvec
         DF <- rbind(DF, tmpDF)
         pointer <- pointer + 1
     }
@@ -148,25 +152,26 @@ for(fileName in fileList){
 	cat(fileName); cat('\n')
     fileLines <- readLines(fileName)
 	CalList <- findCalibrator(fileLines)
-    if(CalList[[1]] == -1){ next }
-	DF  <- readAeffSection(fileLines)
-	DF$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
-	DF$calibrator <- CalList$calibrator
-	DF$EL <- CalList$EL
-	DF$Date <- CalList$UTC
-	DF$sunset <- CalList$sunset
-	DF$fluxR <- CalList$fluxR
-	DF$File <- fileName
-	AeDF <- rbind(AeDF, DF)
+    if(CalList[[1]] != -1){
+	    DF  <- readAeffSection(fileLines)
+	    DF$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
+	    DF$calibrator <- CalList$calibrator
+	    DF$EL <- CalList$EL
+	    DF$Date <- CalList$UTC
+	    DF$sunset <- CalList$sunset
+	    DF$fluxR <- CalList$fluxR
+	    DF$File <- fileName
+	    AeDF <- rbind(AeDF, DF)
+    }
 	Ddf <- readDtermSection(fileLines)
     if( length(attributes(Ddf)) != 0){
-	    Ddf$Band <- DF$Band
-	    Ddf$calibrator <- DF$calibrator
-	    Ddf$EL <- DF$EL
-	    Ddf$Date <- DF$Date
-	    Ddf$sunset <- DF$sunset
-	    Ddf$fluxR <- DF$fluxR
-	    Ddf$File <- DF$File
+	    Ddf$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
+	    #Ddf$calibrator <- DF$calibrator
+	    #Ddf$EL <- DF$EL
+	    #Ddf$Date <- DF$Date
+	    #Ddf$sunset <- DF$sunset
+	    #Ddf$fluxR <- DF$fluxR
+	    Ddf$File <- fileName
 	    DtermDF <- rbind(DtermDF, Ddf)
     }
 }
