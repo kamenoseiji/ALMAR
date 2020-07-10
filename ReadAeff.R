@@ -71,13 +71,14 @@ readDtermSection <- function(Lines){
     spwLabel <- strsplit(Lines[pointer + 1], '[ |:]+')[[1]]
     spwList <- grep('[Dx|Dy]', spwLabel)
     pointer <- pointer + 2
-    FMT <- c('Ant', 'Date', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4')
+    FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4', 'Date')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
     while( is.na(strsplit(Lines[pointer], ' ')[[1]][1]) == F){
         Dline <- gsub('i', 'i ', Lines[pointer])
         Dvec  <- as.complex(strsplit(Dline, ' +')[[1]][spwList])
-        tmpDF <- data.frame(Ant = strsplit(Dline, ' +')[[1]][1], Date=BP_UTC)
-        tmpDF[1,3:10] <- Dvec
+        tmpDF <- data.frame(Ant = strsplit(Dline, ' +')[[1]][1])
+        tmpDF[1,2:9] <- Dvec
+        tmpDF$Date <- BP_UTC
         DF <- rbind(DF, tmpDF)
         pointer <- pointer + 1
     }
@@ -146,7 +147,7 @@ SPL_period <- function(DF, refPeriod, weight=c(0,0)){
 fileList <- parseArg('fileList')
 FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'fluxR')
 AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
-FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4')
+FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4', 'Date')
 DtermDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DtermDF) <- FMT
 for(fileName in fileList){
 	cat(fileName); cat('\n')
