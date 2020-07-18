@@ -54,6 +54,7 @@ parseArg <- function( args ){
 #-------- Find Stokes Parameters
 readStokesSection <- function(Lines, bandID=3){
 	pointer <- grep("mean ", Lines)
+    if(length(pointer) == 0){ return(data.frame())} # No available data
 	srcPointer <- grep("^ [0-999]", Lines)
 	numSource <- length(pointer)
     spw_pointer <- grep("^ SPW[0-99]", Lines)
@@ -185,6 +186,7 @@ for(fileName in fileList){
     bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
     fileLines <- removeBlank(readLines(fileName))
 	DF <- readStokesSection(fileLines, bandID)
+    if(nrow(DF) == 0){  next}
 	DF$File <- fileName
 	FLDF <- rbind(FLDF, na.omit(DF))
 }
