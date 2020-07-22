@@ -58,7 +58,7 @@ readStokesSection <- function(Lines, bandID=3){
 	srcPointer <- grep("^ [0-999]", Lines)
 	numSource <- length(pointer)
     spw_pointer <- grep("^ SPW[0-99]", Lines)
-    spwNum <- ceiling(length(spw_pointer) / numSource)
+    spwNum <- ceiling(length(spw_pointer) / length(srcPointer))
     if(bandID <= 3){ numSubBand <- 3 } else { numSubBand <- 1}
 	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(numSource* numSubBand)
 	errI <- errQ <- errU <- errV <- numeric(numSource* numSubBand)
@@ -190,7 +190,6 @@ for(fileName in fileList){
 	DF$File <- fileName
 	FLDF <- rbind(FLDF, na.omit(DF))
 }
-if(0){
 #-------- Filter impossible records out
 FLDF <- FLDF[((FLDF$I > FLDF$eI) & (FLDF$eI < 1.0)),]       # too large error
 FLDF <- FLDF[FLDF$I^2  > FLDF$Q^2 + FLDF$U^2 +  FLDF$V^2,]  # polarization degree
@@ -276,4 +275,3 @@ for(sourceName in sourceList){
 }
 par(par.old)
 dev.off()
-}
