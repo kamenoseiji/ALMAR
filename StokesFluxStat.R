@@ -190,6 +190,7 @@ for(fileName in fileList){
 	DF$File <- fileName
 	FLDF <- rbind(FLDF, na.omit(DF))
 }
+if(0){
 #-------- Filter impossible records out
 FLDF <- FLDF[((FLDF$I > FLDF$eI) & (FLDF$eI < 1.0)),]       # too large error
 FLDF <- FLDF[FLDF$I^2  > FLDF$Q^2 + FLDF$U^2 +  FLDF$V^2,]  # polarization degree
@@ -203,7 +204,7 @@ FLDF[FLDF$P < sigmaSQ,]$eP_lower <- 0.0
 FLDF$eP_upper <- qrice(0.85, sigmaSQ, FLDF$P)
 FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P)^2
-FLDF$Date <- as.POSIXlt(FLDF$Date, tz="GMT")
+#FLDF$Date <- as.POSIXlt(FLDF$Date, tz="GMT")
 save(FLDF, file='Flux.Rdata')
 #---- Output to text data
 TextDF <- FLDF[order(FLDF$Date),]
@@ -275,3 +276,4 @@ for(sourceName in sourceList){
 }
 par(par.old)
 dev.off()
+}
