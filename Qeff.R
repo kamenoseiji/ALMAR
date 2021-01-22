@@ -44,7 +44,28 @@ digitalEff <- function(thresh){
     weights <- expect / prob / sqrt(2*pi)
     return( corrDigital(expect, weights)  / varDigital(prob, weights) )
 }
-
+#-------- 3-bit Brute Force
+thresh128 <- 64*(0:3)                               # Initial thresholds (uniformly spaced)
+threshPre <- rep(0, length(thresh128))              # As the reference for convergence
+index_gen <- 0                                      # counter for generation
+while( (thresh128 - threshPre) %*% (thresh128 - threshPre) > 0){    # Loop until convergence
+    threshPre <- thresh128                                          # Save the current threshold set
+    thresh_matrix <- matrix(rep(thresh128, 27), ncol=27)        # 27 = 3^3
+    for(index_brute in 0:26){
+        for(index_level in 1:3){
+            trit <- Trit(index_brute, index_level)
+            thresh_matrix[index_level+1, index_brute+1] <- thresh_matrix[index_level+1, index_brute+1] + trit-1
+        }
+    }
+    effGen <- apply(thresh_matrix/128, 2, digitalEff)   # Calculate quantization efficiency 
+    index_selection <- which.max(effGen)                # Select the best efficiency
+    thresh128 <- thresh_matrix[,index_selection]        # Improved threshold set
+    cat(sprintf('Gen %d :', index_gen)); cat(thresh128); cat(sprintf(' : eff=%.7f\n', effGen[index_selection]))
+    index_gen <- index_gen + 1                          # Loop counter
+}
+cat('3-bit : Converged!\n')
+# Champion Result
+#
 #-------- 4-bit Brute Force
 thresh128 <- 32*(0:7)                               # Initial thresholds (uniformly spaced)
 threshPre <- rep(0, length(thresh128))              # As the reference for convergence
@@ -108,6 +129,7 @@ for(index_gen in 1:5000){        # generation
         cat(sprintf('Gen %d :', index_gen)); cat(thresh128); cat(sprintf(' : eff=%.7f\n', effGen[index_selection]))
     }
 }
+}
 #-------- case study
 #
 Label <- 'Current ALMA         '
@@ -126,6 +148,7 @@ weights <- expect / prob / sqrt(2*pi)
 etaALMA <- corrDigital(expect, weights)  / varDigital(prob, weights)
 cat(sprintf('%s : ', Label)); cat(thresh); cat(' / '); cat(weights); cat(sprintf(': efficiency = %.8f\n', etaALMA))
 #
+if(0){
 #
 Label <- 'Powers of sqrt(2)    '
 thresh  <- 0.284* c(0.0, sqrt(2), 2+sqrt(2), 2+3*sqrt(2))
