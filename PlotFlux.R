@@ -23,8 +23,8 @@ FLDF$errL <- FLDF$P - FLDF$eP_lower
 index <- which((FLDF$Band == 3) & (abs(FLDF$Freq - 97.45) > 1.0))
 FLDF <- FLDF[-index,]
 #-------- Today
-#Today <- Sys.Date()
-Today <- "2020-03-01"
+Today <- Sys.Date()
+#Today <- "2020-03-01"
 
 plotLST <- function(DF, band){
     pDF <- data.frame()
