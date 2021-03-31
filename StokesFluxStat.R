@@ -102,7 +102,7 @@ readStokesSection <- function(Lines, bandID=3){
         U <- append(U, preU[1:numSubBand]); eU <- append(eU, 0.25*(preU[(2*numSubBand+1):(3*numSubBand)]-preU[(numSubBand+1):(numSubBand*2)]))
         V <- append(V, preV[1:numSubBand]); eV <- append(eV, 0.25*(preV[(2*numSubBand+1):(3*numSubBand)]-preV[(numSubBand+1):(numSubBand*2)]))
 	}
-	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC)
+	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
 }
 
 #-------- Find Calibrator name
