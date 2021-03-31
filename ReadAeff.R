@@ -1,5 +1,6 @@
 library(suncalc)
 library(scales)
+Sys.setenv(TZ="UTC")
 ALMA_POS <- matrix(c( -67.755, -23.029 ), nrow=1 )
 SSOlist = c('Uranus', 'Neptune', 'Callisto', 'Ganymede', 'Titan', 'Io', 'Europa', 'Ceres', 'Pallas', 'Vesta', 'Juno', 'Mars', 'Mercury', 'Venus')
 #-------- Parse arguments

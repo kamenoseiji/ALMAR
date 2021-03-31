@@ -1,5 +1,5 @@
 library(VGAM)       # for Rice distribution
-
+Sys.setenv(TZ="UTC")
 sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
 
@@ -102,7 +102,7 @@ readStokesSection <- function(Lines, bandID=3){
         U <- append(U, preU[1:numSubBand]); eU <- append(eU, 0.25*(preU[(2*numSubBand+1):(3*numSubBand)]-preU[(numSubBand+1):(numSubBand*2)]))
         V <- append(V, preV[1:numSubBand]); eV <- append(eV, 0.25*(preV[(2*numSubBand+1):(3*numSubBand)]-preV[(numSubBand+1):(numSubBand*2)]))
 	}
-	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=as.POSIXct(srcUTC, tz="UTC"))
+	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC)
 }
 
 #-------- Find Calibrator name
@@ -115,9 +115,9 @@ findCalibrator <- function( Lines ){
 	scaleEL <- as.numeric( strsplit(Lines[scalerPointer], ' ')[[1]][5] )
 	equalizerName <- strsplit(Lines[equalizerPointer], ' ')[[1]][2]
 	if(length(datePointer) > 0){
-		scalerUTC <- strptime(strsplit(Lines[datePointer], ' ')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC")
+		scalerUTC <- strptime(strsplit(Lines[datePointer], ' ')[[1]][6], "%Y/%m/%d/%H:%M:%S")
 	} else {
-		scalerUTC <- strptime(strsplit(Lines[equalizerPointer], ' ')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz="UTC")
+		scalerUTC <- strptime(strsplit(Lines[equalizerPointer], ' ')[[1]][7], "%Y/%m/%d/%H:%M:%S")
 	}
 	return(list(scaler=scalerName, EL=scaleEL, UTC=scalerUTC, equalizer=equalizerName))
 }
@@ -203,7 +203,7 @@ FLDF[FLDF$P < sigmaSQ,]$eP_lower <- 0.0
 FLDF$eP_upper <- qrice(0.85, sigmaSQ, FLDF$P)
 FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P)^2
-#FLDF$Date <- as.POSIXlt(FLDF$Date, tz="GMT")
+#FLDF$Date <- as.POSIXct(FLDF$Date, tz="GMT")
 save(FLDF, file='Flux.Rdata')
 #---- Output to text data
 TextDF <- FLDF[order(FLDF$Date),]
