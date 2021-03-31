@@ -84,11 +84,11 @@ readStokesSection <- function(Lines, bandID=3){
         if(sum(!is.na(spwI)) < 3){ next }
         SBfreq <- median(spwFreq)
 		srcList <- append(srcList, as.character(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][3]) )
-		srcUTC <- append(srcUTC, strptime(strsplit(Lines[srcPointer[srcIndex]], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC"))
+		srcUTC <- append(srcUTC, strptime(strsplit(Lines[srcPointer[srcIndex]], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S"))
 		EL <- append(EL, as.numeric(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][5]))
         if( numSubBand == 3){
 		    srcList <- append(srcList, rep(as.character(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][3]),2) )
-		    srcUTC <- append(srcUTC, rep(strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz="UTC"),2))
+		    srcUTC <- append(srcUTC, rep(strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S"),2))
 		    EL <- append(EL, rep(as.numeric(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][5]), 2))
             SBfreq <- append(SBfreq, c(mean(spwFreq[1:2]), mean(spwFreq[3:4])))
         }
@@ -102,7 +102,7 @@ readStokesSection <- function(Lines, bandID=3){
         U <- append(U, preU[1:numSubBand]); eU <- append(eU, 0.25*(preU[(2*numSubBand+1):(3*numSubBand)]-preU[(numSubBand+1):(numSubBand*2)]))
         V <- append(V, preV[1:numSubBand]); eV <- append(eV, 0.25*(preV[(2*numSubBand+1):(3*numSubBand)]-preV[(numSubBand+1):(numSubBand*2)]))
 	}
-	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
+	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=as.POSIXct(srcUTC, tz="UTC"))
 }
 
 #-------- Find Calibrator name

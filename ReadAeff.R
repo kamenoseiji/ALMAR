@@ -33,7 +33,7 @@ findCalibrator <- function( Lines ){
                 bestR <- fluxR
                 fluxCalName <- strsplit(Lines[SSOpointer], '[ |=]+')[[1]][3]
                 EL <- as.numeric(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][5])
-	            scalerUTC <- strptime(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz="UTC")
+	            scalerUTC <- strptime(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
             }
         }
     }
@@ -62,7 +62,7 @@ readAeffSection <- function(Lines){
 readDtermSection <- function(Lines){
     #---- Date
 	pointer <- grep("EL=", Lines)[1]
-    BP_UTC <- strptime(strsplit(Lines[pointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz="UTC")
+    BP_UTC <- strptime(strsplit(Lines[pointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
     #---- D-term
 	pointer <- grep("D-term", Lines)
     if(length(pointer) == 0){ return(-1)}
