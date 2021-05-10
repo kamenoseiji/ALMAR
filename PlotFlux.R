@@ -62,7 +62,8 @@ numSrc <- length(sourceList)
 #-------- filter by number of observations
 for(src_index in 1:numSrc){
     index <- which(FLDF$Src == sourceList[src_index])
-    if(length(index) < 6){ FLDF <- FLDF[-index,]}
+    #if(length(index) < 6){ FLDF <- FLDF[-index,]}
+    if(length(index) < 4){ FLDF <- FLDF[-index,]}
 }
 sourceList <- unique(FLDF$Src)
 sourceList <- sourceList[grep('^J[0-9]', sourceList)]  # Filter SSOs out
@@ -149,6 +150,7 @@ for(src_index in 1:numSrc){
 	rm(DF)
 	DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
     if(nrow(DF) < 3){ next }
+	if(min(abs(as.numeric(difftime(DF$Date, Today)))) > 30){ next }
 	bands <- unique(DF$Band)
 	numBand <- length(bands)
 	predI <- predQ <- predU <- eI <- eQ <- eU <- numObs <- freq <- numeric(numBand)
