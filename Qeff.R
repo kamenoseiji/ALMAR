@@ -45,91 +45,97 @@ digitalEff <- function(thresh){
     return( corrDigital(expect, weights)  / varDigital(prob, weights) )
 }
 #-------- 3-bit Brute Force
-thresh128 <- 64*(0:3)                               # Initial thresholds (uniformly spaced)
+thresh128 <- 40*(0:3)                               # Initial thresholds (uniformly spaced)
 threshPre <- rep(0, length(thresh128))              # As the reference for convergence
 index_gen <- 0                                      # counter for generation
+granularity <- 1
 while( (thresh128 - threshPre) %*% (thresh128 - threshPre) > 0){    # Loop until convergence
     threshPre <- thresh128                                          # Save the current threshold set
     thresh_matrix <- matrix(rep(thresh128, 27), ncol=27)        # 27 = 3^3
     for(index_brute in 0:26){
         for(index_level in 1:3){
-            trit <- Trit(index_brute, index_level)
-            thresh_matrix[index_level+1, index_brute+1] <- thresh_matrix[index_level+1, index_brute+1] + trit-1
+            trit <- granularity* Trit(index_brute, index_level)
+            thresh_matrix[index_level+1, index_brute+1] <- thresh_matrix[index_level+1, index_brute+1] + trit - granularity
         }
     }
     effGen <- apply(thresh_matrix/128, 2, digitalEff)   # Calculate quantization efficiency 
     index_selection <- which.max(effGen)                # Select the best efficiency
     thresh128 <- thresh_matrix[,index_selection]        # Improved threshold set
     cat(sprintf('Gen %d :', index_gen)); cat(thresh128); cat(sprintf(' : eff=%.7f\n', effGen[index_selection]))
+    if(max(thresh128) > 2^7 * granularity - 1){                         # Exceeding 8-bit max level
+        granularity <- granularity + 1                   # Coarser levels
+        thresh128 <- thresh128 - thresh128 %% granularity# re-normalization
+    }
     index_gen <- index_gen + 1                          # Loop counter
 }
-cat('3-bit : Converged!\n')
+cat(sprintf('Converged! 3-bit/granularity = %d\n', granularity))
 # Champion Result
 #
 #-------- 4-bit Brute Force
-thresh128 <- 32*(0:7)                               # Initial thresholds (uniformly spaced)
+ENOB <- 4
+thresh128 <- 32*(0:(2^(ENOB-1)-1))                    # Initial thresholds (uniformly spaced)
 threshPre <- rep(0, length(thresh128))              # As the reference for convergence
 index_gen <- 0                                      # counter for generation
+granularity <- 1
 while( (thresh128 - threshPre) %*% (thresh128 - threshPre) > 0){    # Loop until convergence
     threshPre <- thresh128                                          # Save the current threshold set
     thresh_matrix <- matrix(rep(thresh128, 2187), ncol=2187)        # 2187 = 3^7
     for(index_brute in 0:2186){
         for(index_level in 1:7){
-            trit <- Trit(index_brute, index_level)
-            thresh_matrix[index_level+1, index_brute+1] <- thresh_matrix[index_level+1, index_brute+1] + trit-1
+            trit <- granularity* Trit(index_brute, index_level)
+            thresh_matrix[index_level+1, index_brute+1] <- thresh_matrix[index_level+1, index_brute+1] + trit - granularity  
         }
     }
     effGen <- apply(thresh_matrix/128, 2, digitalEff)   # Calculate quantization efficiency 
     index_selection <- which.max(effGen)                # Select the best efficiency
     thresh128 <- thresh_matrix[,index_selection]        # Improved threshold set
     cat(sprintf('Gen %d :', index_gen)); cat(thresh128); cat(sprintf(' : eff=%.7f\n', effGen[index_selection]))
+    if(max(thresh128) > 2^7 * granularity - 1){                         # Exceeding 8-bit max level
+        granularity <- granularity + 1                   # Coarser levels
+        thresh128 <- thresh128 - thresh128 %% granularity# re-normalization
+    }
     index_gen <- index_gen + 1                          # Loop counter
 }
-cat('4-bit : Converged!\n')
+cat(sprintf('Converged! 4-bit/granularity = %d\n', granularity))
 # Champion Result
 #Gen 83 :0 33 67 103 141 184 236 307 : eff=0.9904976
 #
-if(0){
 #-------- Simulated annealing 5-bit
-thresh128 <- 20*(0:15)   # Initial thresholds (uniformly spaced)
-for(index_gen in 1:100000){        # generation
-    thresh_matrix <- matrix(rep(thresh128, 9), ncol=9)
-    index_mutation <- sample(2:16,2,replace=F)           # Random selection of two threshold levels to mutate
-    step_mutation  <- sample(1:5,2,replace=T)           # Random step size
-    thresh_matrix[index_mutation[1], seq(2,8,by=3)] <- thresh_matrix[index_mutation[1], seq(2,8,by=3)] + step_mutation[1]
-    thresh_matrix[index_mutation[1], seq(3,9,by=3)] <- thresh_matrix[index_mutation[1], seq(3,9,by=3)] - step_mutation[1]
-    thresh_matrix[index_mutation[2], 4:6]           <- thresh_matrix[index_mutation[2], 4:6]           + step_mutation[2]
-    thresh_matrix[index_mutation[2], 7:9]           <- thresh_matrix[index_mutation[2], 7:9]           - step_mutation[2]
+ENOB <- 5
+thresh128 <- 21*(0:(2^(ENOB-1)-1))                    # Initial thresholds (uniformly spaced)
+#thresh128 <- c(0, 18, 36, 54, 72, 90, 109, 128, 148, 169, 192, 218, 247, 281, 323, 383)
+granularity <- 1
+nMut <- 6
+trit <- matrix(rep(0, nMut* 3^(nMut-1)), nrow=nMut)
+for(bitIndex in 1:nMut){
+    trit[bitIndex,] <- which( (seq(3^nMut) %/% (3^(bitIndex-1))  ) %% 3 == 1) + 1
+}
+for(index_gen in 1:1000){        # generation
+    thresh_matrix <- matrix(rep(thresh128, 3^nMut), ncol=3^nMut)
+    index_mutation <- sample(2:16,nMut,replace=F)           # Random selection of two threshold levels to mutate
+    #step_mutation  <- granularity* sample(1:3,nMut,replace=T)           # Random step size
+    step_mutation  <- rep(granularity,nMut)           # Random step size
+    for(index in 1:nMut){
+        inc_index <- trit[index,]
+        dec_index <- inc_index + 3^(index-1)
+        thresh_matrix[index_mutation[index], inc_index] <- thresh_matrix[index_mutation[index], inc_index] + step_mutation[index]
+        thresh_matrix[index_mutation[index], dec_index] <- thresh_matrix[index_mutation[index], dec_index] - step_mutation[index]
+    }
     effGen <- apply(thresh_matrix/128, 2, digitalEff)   # Calculate quantization efficiency 
     index_selection <- which.max(effGen)                # Select the best efficiency
     if(index_selection > 1){                            # In the case of evolution
         thresh128 <- thresh_matrix[,index_selection]
         cat(sprintf('Gen %d :', index_gen)); cat(thresh128); cat(sprintf(' : eff=%.7f\n', effGen[index_selection]))
     }
+    if(max(thresh128) > (2^7 - 1) * granularity){        # Exceeding 8-bit max level
+        granularity <- granularity + 1                   # Coarser levels
+        thresh128 <- thresh128 - thresh128 %% granularity# re-normalization
+    }
 }
-cat('5-bit : Converged!\n')
+cat(sprintf('Converged! 5-bit/granularity = %d\n', granularity))
 # Champion Result
 #Gen 14089 :0 18 36 54 72 90 109 128 148 169 192 218 247 281 323 383 : eff=0.9974881
 
-
-#-------- Simulated annealing
-thresh128 <- c(0, 32, 64, 96, 128, 160, 192, 256)   # Initial thresholds (uniformly spaced)
-for(index_gen in 1:5000){        # generation
-    thresh_matrix <- matrix(rep(thresh128, 9), ncol=9)
-    index_mutation <- sample(2:8,2,replace=F)           # Random selection of two threshold levels to mutate
-    step_mutation  <- sample(1:5,2,replace=T)           # Random step size
-    thresh_matrix[index_mutation[1], seq(2,8,by=3)] <- thresh_matrix[index_mutation[1], seq(2,8,by=3)] + step_mutation[1]
-    thresh_matrix[index_mutation[1], seq(3,9,by=3)] <- thresh_matrix[index_mutation[1], seq(3,9,by=3)] - step_mutation[1]
-    thresh_matrix[index_mutation[2], 4:6]           <- thresh_matrix[index_mutation[2], 4:6]           + step_mutation[2]
-    thresh_matrix[index_mutation[2], 7:9]           <- thresh_matrix[index_mutation[2], 7:9]           - step_mutation[2]
-    effGen <- apply(thresh_matrix/128, 2, digitalEff)   # Calculate quantization efficiency 
-    index_selection <- which.max(effGen)                # Select the best efficiency
-    if(index_selection > 1){                            # In the case of evolution
-        thresh128 <- thresh_matrix[,index_selection]
-        cat(sprintf('Gen %d :', index_gen)); cat(thresh128); cat(sprintf(' : eff=%.7f\n', effGen[index_selection]))
-    }
-}
-}
 #-------- case study
 #
 Label <- 'Current ALMA         '
