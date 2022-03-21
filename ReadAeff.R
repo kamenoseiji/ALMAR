@@ -10,7 +10,7 @@ parseArg <- function( args ){
 }
 #-------- Find Calibrator name
 findCalibrator <- function( Lines ){
-	if( length(grep(" Aeff", Lines)) == 0){ return(list(-1))}
+	if( length(grep(" Aeff", Lines)) == 0){ return(list(0))}
     bestR <- -1.0
     for(SSO in SSOlist){
         SSOpointers <- grep(paste(SSO, 'EL'), Lines)
@@ -58,6 +58,31 @@ readAeffSection <- function(Lines){
 		pointer <- pointer + 1
 	}
 	return(DF)
+}
+#-------- Read Aeff Section from a priori calibration
+readAeApriori <- function(Lines){
+    pointer <- grep("Use J", Lines)[2]
+    if( length(grep('^[A-Z]', Lines[pointer+1])) == 0 ){ return(-1) }
+    FMT <- c('Ant', 'AeX', 'AeY', 'calibrator', 'EL', 'Date', 'sunset', 'fluxR')
+    DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
+    strList = strsplit(Lines[pointer], '[ |=]+')[[1]]
+    tmpDate <- strptime(strList[7], "%Y/%m/%d/%H:%M:%S")
+    pointer <- pointer + 1
+	while( length(grep('^[A-Z]', Lines[pointer])) > 0){
+        antStrList = strsplit(Lines[pointer], ' +')[[1]]
+        tmpDF <- data.frame(
+            Ant = antStrList[1],
+            AeX = as.numeric(antStrList[2]),
+            AeY = as.numeric(antStrList[3]),
+            calibrator = strList[2],
+            EL = as.numeric(strList[5]),
+            Date = tmpDate,
+            sunset = as.numeric(difftime(tmpDate, getSunlightTimes(as.Date(tmpDate), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]))%%24, 
+            fluxR = 1.0)
+        DF <- rbind(DF, tmpDF)
+        pointer <- pointer + 1
+    }
+    return(DF)
 }
 #-------- Read D-term Section
 readDtermSection <- function(Lines){
@@ -153,18 +178,24 @@ DtermDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnam
 for(fileName in fileList){
 	cat(fileName); cat('\n')
     fileLines <- readLines(fileName)
+    if(length(fileLines) < 10){ next }
+    if(fileLines[1] == ''){ next }
 	CalList <- findCalibrator(fileLines)
-    if(CalList[[1]] != -1){
+    if(CalList[[1]] == -1){ next }
+    if(CalList[[1]] > 0){
 	    DF  <- readAeffSection(fileLines)
-	    DF$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
 	    DF$calibrator <- CalList$calibrator
 	    DF$EL <- CalList$EL
 	    DF$Date <- CalList$UTC
 	    DF$sunset <- CalList$sunset
 	    DF$fluxR <- CalList$fluxR
-	    DF$File <- fileName
-	    AeDF <- rbind(AeDF, DF)
+    } else {
+        DF <- readAeApriori(fileLines)
     }
+    if(DF == -1){ next }
+    DF$File <- fileName
+	AeDF <- rbind(AeDF, DF)
+	DF$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
 	Ddf <- readDtermSection(fileLines)
     if( length(attributes(Ddf)) != 0){
 	    Ddf$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])

@@ -10,7 +10,7 @@ BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/1
 BandFreq <- c(43.0, 75.0, 97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
 
 #-------- Load Flux.Rdata from web
-FluxDataURL <- "http://www.alma.cl/~skameno/Grid/Stokes/"
+FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
 load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
 URL <- "https://raw.githubusercontent.com/kamenoseiji/PolaR/master/date.R"
 Err <- try( eval(parse(text = getURL(URL, ssl.verifypeer = FALSE))), silent=FALSE)
@@ -112,7 +112,7 @@ for(freq_index in 1:numFreq){
 	names(polDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)', 'sd(EVPA)')
 	polDF$Source <- paste('<a href="', polDF$Source, '.flux.html" target="_new" >', polDF$Source, ' </a>', sep='')
 	htmlFile <- sprintf('Stokes%.0fGHz.html', freqList[freq_index])
-	html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="http://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
+	html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
 	html.table <- paste(print(xtable(polDF, digits=c(0,0,0,3,3,3,3,3,3,3,3,1,1,1)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
 	html.body <- paste("<body>", CaptionText, html.table, "</body>")
 	write(paste(html.head, html.body, sep='\n'), htmlFile)
