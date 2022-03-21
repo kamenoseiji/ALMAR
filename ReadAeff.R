@@ -194,8 +194,8 @@ for(fileName in fileList){
     }
     if(DF == -1){ next }
     DF$File <- fileName
-	AeDF <- rbind(AeDF, DF)
 	DF$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
+	AeDF <- rbind(AeDF, DF)
 	Ddf <- readDtermSection(fileLines)
     if( length(attributes(Ddf)) != 0){
 	    Ddf$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
