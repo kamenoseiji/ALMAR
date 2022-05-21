@@ -62,9 +62,9 @@ readAeffSection <- function(Lines){
 #-------- Read Aeff Section from a priori calibration
 readAeApriori <- function(Lines){
     pointer <- grep("Use J", Lines)[2]
-    if( length(grep('^[A-Z]', Lines[pointer+1])) == 0 ){ return(-1) }
     FMT <- c('Ant', 'AeX', 'AeY', 'calibrator', 'EL', 'Date', 'sunset', 'fluxR')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
+    if( length(grep('^[A-Z]', Lines[pointer+1])) == 0 ){ return(DF) }
     strList = strsplit(Lines[pointer], '[ |=]+')[[1]]
     tmpDate <- strptime(strList[7], "%Y/%m/%d/%H:%M:%S")
     pointer <- pointer + 1
@@ -192,7 +192,7 @@ for(fileName in fileList){
     } else {
         DF <- readAeApriori(fileLines)
     }
-    if(DF == -1){ next }
+    if( nrow(DF) < 1 ){ next }
     DF$File <- fileName
 	DF$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
 	AeDF <- rbind(AeDF, DF)
