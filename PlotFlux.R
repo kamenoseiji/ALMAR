@@ -157,11 +157,14 @@ for(src_index in 1:numSrc){
     if(numBand > 1){
 	    for(band_index in 1:numBand){
 	    	index <- which(DF$Band == bands[band_index])
-	    	numObs[band_index] <- length(index)
-	    	if(numObs[band_index] <= 2){
-	    		predI[band_index] <- mean(DF$I[index]); predQ[band_index] <- mean(DF$Q[index]); predU[band_index] <- mean(DF$U[index])
-	    		eI[band_index] <- 10*mean(DF$eI[index]); eQ[band_index] <- 10*mean(DF$eQ[index]); eU[band_index] <- 10*mean(DF$eU[index])
-	    	} else {
+            numObs[band_index] <- length(index)
+            deltaDay <- as.numeric(difftime(DF[index,]$Date, Today))
+            BandTimeFit <- TRUE
+	    	if( numObs[band_index] <= 2 ){ BandTimeFit <- FALSE }
+            if( BandTimeFit ){
+	    	    if(sd(deltaDay) < min(abs(deltaDay)) ){ BandTimeFit <- FALSE }
+            }
+            if( BandTimeFit ){
 	    		deltaDay <- as.numeric(difftime(DF[index,]$Date, Today))
 	    		fit <- lm(DF$I[index] ~ deltaDay, weights=1/DF$eI[index]^2/abs(deltaDay + 1))
 	    		predI[band_index] <- summary(fit)$coefficients[1,'Estimate']
@@ -172,7 +175,10 @@ for(src_index in 1:numSrc){
 	    		fit <- lm(DF$U[index] ~ deltaDay, weights=1/DF$eU[index]^2/abs(deltaDay + 1))
 	    		predU[band_index] <- summary(fit)$coefficients[1,'Estimate']
 	    		eU[band_index] <- summary(fit)$coefficients[1,'Std. Error']	
-	    	}
+            } else {
+	    		predI[band_index] <- mean(DF$I[index]); predQ[band_index] <- mean(DF$Q[index]); predU[band_index] <- mean(DF$U[index])
+	    		eI[band_index] <- median(DF$eI[index]); eQ[band_index] <- median(DF$eQ[index]); eU[band_index] <- median(DF$eU[index])
+            }
 	    	freq[band_index] <- median(DF$Freq[index])
 	    }
     	fit <- lm( log(predI) ~ log(freq/100), weights=1.0/eI^2 ); spixI[src_index] <- coef(fit)[2]; I100[src_index] <- exp(coef(fit)[1])

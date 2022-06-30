@@ -2,6 +2,7 @@ library(VGAM)       # for Rice distribution
 Sys.setenv(TZ="UTC")
 sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
+numSubBand = c(3,3,3,1,1,1,1,1,1,1) # Number of sub-bands for Band[1-10]
 
 sourceMatch <- function(sourceName){
 	sourceDict <- list(
@@ -59,9 +60,9 @@ readStokesSection <- function(Lines, bandID=3){
 	numSource <- length(pointer)
     spw_pointer <- grep("^ SPW[0-99]", Lines)
     spwNum <- ceiling(length(spw_pointer) / length(srcPointer))
-    if(bandID <= 3){ numSubBand <- 3 } else { numSubBand <- 1}
-	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(numSource* numSubBand)
-	errI <- errQ <- errU <- errV <- numeric(numSource* numSubBand)
+    #if(bandID <= 3){ numSubBand <- 3 } else { numSubBand <- 1}
+	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(numSource* numSubBand[bandID])
+	errI <- errQ <- errU <- errV <- numeric(numSource* numSubBand[bandID])
 	FREQ <- I <- Q <- U <- V <- numeric(0)
 	eI <- eQ <- eU <- eV <- numeric(0)
 	srcList <- character(0); EL <- numeric(0)
@@ -86,7 +87,7 @@ readStokesSection <- function(Lines, bandID=3){
 		srcList <- append(srcList, as.character(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][3]) )
 		srcUTC <- append(srcUTC, strptime(strsplit(Lines[srcPointer[srcIndex]], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S"))
 		EL <- append(EL, as.numeric(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][5]))
-        if( numSubBand == 3){
+        if( numSubBand[bandID] == 3){
 		    srcList <- append(srcList, rep(as.character(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][3]),2) )
 		    srcUTC <- append(srcUTC, rep(strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S"),2))
 		    EL <- append(EL, rep(as.numeric(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][5]), 2))
@@ -97,10 +98,10 @@ readStokesSection <- function(Lines, bandID=3){
         preQ <- predict(lm(data=data.frame(freq=spwFreq, Q=spwQ, eQ=spweQ), formula=Q~freq, weights=1.0/eQ^2), new=data.frame(freq=SBfreq), interval='confidence')
         preU <- predict(lm(data=data.frame(freq=spwFreq, U=spwU, eU=spweU), formula=U~freq, weights=1.0/eU^2), new=data.frame(freq=SBfreq), interval='confidence')
         preV <- predict(lm(data=data.frame(freq=spwFreq, V=spwV, eV=spweV), formula=V~freq, weights=1.0/eV^2), new=data.frame(freq=SBfreq), interval='confidence')
-        I <- append(I, preI[1:numSubBand]); eI <- append(eI, 0.25*(preI[(2*numSubBand+1):(3*numSubBand)]-preI[(numSubBand+1):(numSubBand*2)]))
-        Q <- append(Q, preQ[1:numSubBand]); eQ <- append(eQ, 0.25*(preQ[(2*numSubBand+1):(3*numSubBand)]-preQ[(numSubBand+1):(numSubBand*2)]))
-        U <- append(U, preU[1:numSubBand]); eU <- append(eU, 0.25*(preU[(2*numSubBand+1):(3*numSubBand)]-preU[(numSubBand+1):(numSubBand*2)]))
-        V <- append(V, preV[1:numSubBand]); eV <- append(eV, 0.25*(preV[(2*numSubBand+1):(3*numSubBand)]-preV[(numSubBand+1):(numSubBand*2)]))
+        I <- append(I, preI[1:numSubBand[bandID]]); eI <- append(eI, 0.25*(preI[(2*numSubBand[bandID]+1):(3*numSubBand[bandID])]-preI[(numSubBand[bandID]+1):(numSubBand[bandID]*2)]))
+        Q <- append(Q, preQ[1:numSubBand[bandID]]); eQ <- append(eQ, 0.25*(preQ[(2*numSubBand[bandID]+1):(3*numSubBand[bandID])]-preQ[(numSubBand[bandID]+1):(numSubBand[bandID]*2)]))
+        U <- append(U, preU[1:numSubBand[bandID]]); eU <- append(eU, 0.25*(preU[(2*numSubBand[bandID]+1):(3*numSubBand[bandID])]-preU[(numSubBand[bandID]+1):(numSubBand[bandID]*2)]))
+        V <- append(V, preV[1:numSubBand[bandID]]); eV <- append(eV, 0.25*(preV[(2*numSubBand[bandID]+1):(3*numSubBand[bandID])]-preV[(numSubBand[bandID]+1):(numSubBand[bandID]*2)]))
 	}
 	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
 }
@@ -170,8 +171,6 @@ removeBlank <- function(Lines){
 	index <- which(lineLength > 1)
 	return(Lines[index])
 }
-
-
 #-------- Start program
 #Arguments <- commandArgs(trailingOnly = T)
 Arguments <- 'fileList'
@@ -179,19 +178,46 @@ fileList <- parseArg(Arguments)
 FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
 FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
 
-flagNum <- list()
+#-------- Count number of records
+recordNum <- 0
+band
 for(fileName in fileList){
-	cat(fileName); cat('\n')
+    bandPointer <- regexpr("RB_[0-10]", fileName)[1]
+    bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
+    fileLines <- removeBlank(readLines(fileName))
+    recordNum <- recordNum + numSubBand[bandID]* length(grep('mean', fileLines))
+}
+#-------- Empty FLDF
+FLDF <- data.frame( Src = rep(DF[1,1], recordNum),
+                    Freq= rep(DF[1,2], recordNum),
+                    EL  = rep(DF[1,3], recordNum),
+                    I   = rep(DF[1,4], recordNum),
+                    Q   = rep(DF[1,5], recordNum),
+                    U   = rep(DF[1,6], recordNum),
+                    V   = rep(DF[1,7], recordNum),
+                    eI  = rep(DF[1,8], recordNum),
+                    eQ  = rep(DF[1,9], recordNum),
+                    eU  = rep(DF[1,10],recordNum),
+                    eV  = rep(DF[1,11],recordNum),
+                    Date= rep(DF[1,12],recordNum),
+                    File= rep(fileName,recordNum))
+#flagNum <- list()
+FLDFpointer <- 1
+for(fileName in fileList){
     bandPointer <- regexpr("RB_[0-10]", fileName)[1]
     bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
     fileLines <- removeBlank(readLines(fileName))
 	DF <- readStokesSection(fileLines, bandID)
     if(nrow(DF) == 0){  next}
 	DF$File <- fileName
-	FLDF <- rbind(FLDF, na.omit(DF))
+	if(anyNA(DF)){ cat(sprintf('NA detected in %s\n', fileName)) }
+    recordNum <- nrow(DF)
+    FLDF[FLDFpointer:(FLDFpointer + recordNum - 1),] <- DF
+    FLDFpointer <- FLDFpointer + recordNum
 }
+FLDF <- na.omit(FLDF)
 #-------- Filter impossible records out
-FLDF <- FLDF[((FLDF$I > FLDF$eI) & (FLDF$eI < 1.0)),]       # too large error
+FLDF <- FLDF[FLDF$I > 2.0* FLDF$eI, ]       # too large error
 FLDF <- FLDF[FLDF$I^2  > FLDF$Q^2 + FLDF$U^2 +  FLDF$V^2,]  # polarization degree
 #-------- 
 FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))

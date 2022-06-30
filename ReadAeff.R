@@ -208,7 +208,9 @@ for(fileName in fileList){
 	    DtermDF <- rbind(DtermDF, Ddf)
     }
 }
+AeDF <- AeDF[complete.cases(AeDF$Date),]
 AeDF <- AeDF[order(AeDF$Date), ]
+DtermDF <- DtermDF[complete.cases(DtermDF$Date),]
 DtermDF <- DtermDF[order(DtermDF$Date), ]
 save(AeDF, file='AeDF.Rdata')
 save(DtermDF, file='Dterm.Rdata')
