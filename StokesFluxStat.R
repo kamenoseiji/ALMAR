@@ -66,7 +66,7 @@ readStokesSection <- function(Lines, bandID=3){
 	FREQ <- I <- Q <- U <- V <- numeric(0)
 	eI <- eQ <- eU <- eV <- numeric(0)
 	srcList <- character(0); EL <- numeric(0)
-	srcUTC <- as.Date(as.character(NULL))
+	srcUTC <- as.Date(as.character(NULL), tz='UTC')
 	for(srcIndex in 1:numSource){
         spwPointerList <- spw_pointer[which((spw_pointer < pointer[srcIndex]) & (spw_pointer > srcPointer[srcIndex]))]
         spwFreq <- spwI <- spwQ <- spwU <- spwV <- spweI <- spweQ <- spweU <- spweV <- numeric(spwNum)
@@ -85,11 +85,11 @@ readStokesSection <- function(Lines, bandID=3){
         if(sum(!is.na(spwI)) < 3){ next }
         SBfreq <- median(spwFreq)
 		srcList <- append(srcList, as.character(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][3]) )
-		srcUTC <- append(srcUTC, strptime(strsplit(Lines[srcPointer[srcIndex]], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S"))
+		srcUTC <- append(srcUTC, strptime(strsplit(Lines[srcPointer[srcIndex]], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz='UTC'))
 		EL <- append(EL, as.numeric(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][5]))
         if( numSubBand[bandID] == 3){
 		    srcList <- append(srcList, rep(as.character(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][3]),2) )
-		    srcUTC <- append(srcUTC, rep(strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S"),2))
+		    srcUTC <- append(srcUTC, rep(strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz='UTC'),2))
 		    EL <- append(EL, rep(as.numeric(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][5]), 2))
             SBfreq <- append(SBfreq, c(mean(spwFreq[1:2]), mean(spwFreq[3:4])))
         }
@@ -105,7 +105,13 @@ readStokesSection <- function(Lines, bandID=3){
 	}
 	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
 }
-
+#-------- Generate a data frame from a flux log file
+fileDF <- function(fileName){
+    bandPointer <- regexpr("RB_[0-10]", fileName)[1]
+    bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
+    fileLines <- removeBlank(readLines(fileName))
+	return(readStokesSection(fileLines, bandID))
+}
 #-------- Find Calibrator name
 findCalibrator <- function( Lines ){
 	scalerPointer    <- grep("Scaler", Lines)
@@ -116,9 +122,9 @@ findCalibrator <- function( Lines ){
 	scaleEL <- as.numeric( strsplit(Lines[scalerPointer], ' ')[[1]][5] )
 	equalizerName <- strsplit(Lines[equalizerPointer], ' ')[[1]][2]
 	if(length(datePointer) > 0){
-		scalerUTC <- strptime(strsplit(Lines[datePointer], ' ')[[1]][6], "%Y/%m/%d/%H:%M:%S")
+		scalerUTC <- strptime(strsplit(Lines[datePointer], ' ')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz='UTC')
 	} else {
-		scalerUTC <- strptime(strsplit(Lines[equalizerPointer], ' ')[[1]][7], "%Y/%m/%d/%H:%M:%S")
+		scalerUTC <- strptime(strsplit(Lines[equalizerPointer], ' ')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz='UTC')
 	}
 	return(list(scaler=scalerName, EL=scaleEL, UTC=scalerUTC, equalizer=equalizerName))
 }
@@ -175,12 +181,10 @@ removeBlank <- function(Lines){
 #Arguments <- commandArgs(trailingOnly = T)
 Arguments <- 'fileList'
 fileList <- parseArg(Arguments)
-FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
-FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
-
+#FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
+#FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
 #-------- Count number of records
 recordNum <- 0
-band
 for(fileName in fileList){
     bandPointer <- regexpr("RB_[0-10]", fileName)[1]
     bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
@@ -188,33 +192,42 @@ for(fileName in fileList){
     recordNum <- recordNum + numSubBand[bandID]* length(grep('mean', fileLines))
 }
 #-------- Empty FLDF
-FLDF <- data.frame( Src = rep(DF[1,1], recordNum),
-                    Freq= rep(DF[1,2], recordNum),
-                    EL  = rep(DF[1,3], recordNum),
-                    I   = rep(DF[1,4], recordNum),
-                    Q   = rep(DF[1,5], recordNum),
-                    U   = rep(DF[1,6], recordNum),
-                    V   = rep(DF[1,7], recordNum),
-                    eI  = rep(DF[1,8], recordNum),
-                    eQ  = rep(DF[1,9], recordNum),
-                    eU  = rep(DF[1,10],recordNum),
-                    eV  = rep(DF[1,11],recordNum),
-                    Date= rep(DF[1,12],recordNum),
-                    File= rep(fileName,recordNum))
-#flagNum <- list()
+FLDF <- data.frame( Src = rep('', recordNum),
+                    Freq= rep(0.0, recordNum),
+                    EL  = rep(0.0, recordNum),
+                    I   = rep(0.0, recordNum),
+                    Q   = rep(0.0, recordNum),
+                    U   = rep(0.0, recordNum),
+                    V   = rep(0.0, recordNum),
+                    eI  = rep(1e9, recordNum),
+                    eQ  = rep(1e9, recordNum),
+                    eU  = rep(1e9,recordNum),
+                    eV  = rep(1e9,recordNum),
+                    Date= rep(as.POSIXct(Sys.time(), tz="UTC"), recordNum),
+                    File= rep('hidoi-Flux.log',recordNum))
 FLDFpointer <- 1
-for(fileName in fileList){
-    bandPointer <- regexpr("RB_[0-10]", fileName)[1]
-    bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
-    fileLines <- removeBlank(readLines(fileName))
-	DF <- readStokesSection(fileLines, bandID)
-    if(nrow(DF) == 0){  next}
-	DF$File <- fileName
-	if(anyNA(DF)){ cat(sprintf('NA detected in %s\n', fileName)) }
-    recordNum <- nrow(DF)
-    FLDF[FLDFpointer:(FLDFpointer + recordNum - 1),] <- DF
+DFList <- lapply(fileList, fileDF)
+for(file_index in 1:length(DFList)){
+    if(nrow(DFList[[file_index]]) == 0){  next}
+	DFList[[file_index]]$File <- fileList[file_index]
+	if(anyNA(DFList[[file_index]])){ cat(sprintf('NA detected in %s\n', fileList[file_index])) }
+    recordNum <- nrow(DFList[[file_index]])
+    FLDF[FLDFpointer:(FLDFpointer + recordNum - 1),] <- DFList[[file_index]]
     FLDFpointer <- FLDFpointer + recordNum
 }
+#
+#for(fileName in fileList){
+#    bandPointer <- regexpr("RB_[0-10]", fileName)[1]
+#    bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
+#    fileLines <- removeBlank(readLines(fileName))
+#	DF <- readStokesSection(fileLines, bandID)
+#    if(nrow(DF) == 0){  next}
+#	DF$File <- fileName
+#	if(anyNA(DF)){ cat(sprintf('NA detected in %s\n', fileName)) }
+#    recordNum <- nrow(DF)
+#    FLDF[FLDFpointer:(FLDFpointer + recordNum - 1),] <- DF
+#    FLDFpointer <- FLDFpointer + recordNum
+#}
 FLDF <- na.omit(FLDF)
 #-------- Filter impossible records out
 FLDF <- FLDF[FLDF$I > 2.0* FLDF$eI, ]       # too large error
@@ -257,7 +270,7 @@ polDF <- polDF[order(polDF$P, decreasing=T),]
 rownames(polDF) <- c(1:nrow(polDF))
 save(polDF, file='Pol.Rdata')
 
-sourceList <- polDF$Src[grep('^J[0-9]', polDF$Src)]
+sourceList <- sort(polDF$Src[grep('^J[0-9]', polDF$Src)])
 #-------- Plot time-seried flux densities
 pdf('AMAPOLA.pdf', width=8, height=11)
 par.old <- par(no.readonly=TRUE)
