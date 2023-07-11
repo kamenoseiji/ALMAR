@@ -1,17 +1,40 @@
 library(RColorBrewer)
 library(xtable)
 library(plotly, warn.conflicts=FALSE)
+library(pandoc)
 library(htmlwidgets)
 library(RCurl)
+#-------- Parse arguments
+parseArg <- function( args ){
+    argList <- list(as.character(Sys.Date()), TRUE, TRUE, TRUE)
+    names(argList) <- c('Date', 'Table', 'Source', 'LST')
+	if( is.logical(args) == FALSE) return(argList)
+    argNum <- length(args)
+    for( index in 1:argNum ){
+        if(substr(args[index], 1,2) == "-D"){ argList$Date  <- as.character(substring(args[index], 3)) }
+        if(substr(args[index], 1,2) == "-T"){ argList$Table <- FALSE }
+        if(substr(args[index], 1,2) == "-S"){ argList$Source <- FALSE }
+        if(substr(args[index], 1,2) == "-L"){ argList$LST <- FALSE }
+    }
+    return(argList)
+}
+#-------- Running input parameters
+Arguments <- commandArgs(trailingOnly = TRUE)
+argList <- parseArg(Arguments)
+Today <- argList$Date
+Sys.setenv(TZ="UTC")
 ALMA_lat <- -23.029 * pi / 180
 #-------- FE-specific PA
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
 BandFreq <- c(43.0, 75.0, 97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
-
 #-------- Load Flux.Rdata from web
 FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
-load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
+RdataURL    <- "https://www.alma.cl/~skameno/AMAPOLA/"
+load("Flux.Rdata")     # Locally generated FLDF
+#load(url(paste(RdataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
+# (temporal webserver) FluxDataURL <- "https://kamenoseiji.sakura.ne.jp/AMAPOLA/"
+# (temporal webserver) load('Flux.Rdata')     # Data frame of FLDF
 URL <- "https://raw.githubusercontent.com/kamenoseiji/PolaR/master/date.R"
 Err <- try( eval(parse(text = getURL(URL, ssl.verifypeer = FALSE))), silent=FALSE)
 
@@ -22,10 +45,7 @@ FLDF$errU <- FLDF$eP_upper - FLDF$P
 FLDF$errL <- FLDF$P - FLDF$eP_lower
 index <- which((FLDF$Band == 3) & (abs(FLDF$Freq - 97.45) > 1.0))
 FLDF <- FLDF[-index,]
-#-------- Today
-Today <- Sys.Date()
-#Today <- "2020-03-01"
-
+#-------- Plot LST
 plotLST <- function(DF, band){
     pDF <- data.frame()
 	DF <- DF[abs(DF$DEC - ALMA_lat) > 4.0*pi/180.0,]	# zenith avoidance of 4 degree
@@ -83,46 +103,48 @@ for(band_index in 1:length(bandList)){
 }
 freqLabel <- sprintf('%.1f GHz', freqList)
 #-------- HTML table of source flux 
-for(freq_index in 1:numFreq){
-	medI <- medQ <- medU <- eI <- eQ <- eU <- numObs <- rep(NA, numSrc)
-    lastDateIndex <- which.max(as.numeric(FLDF[FLDF$Freq == freqList[freq_index],]$Date))
-	for(src_index in 1:numSrc){
-		DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (FLDF$Freq == freqList[freq_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
-        if(nrow(DF) == 0){ next }
-		medI[src_index] <- median(DF$I); medQ[src_index] <- median(DF$Q); medU[src_index] <- median(DF$U)
-		numObs[src_index] <- length(DF$eI)
-		if(numObs[src_index] == 1){
-			eI[src_index] <- DF$eI; eQ[src_index] <- DF$eQ; eU[src_index] <- DF$eU
-		} else {
-			eI[src_index] <- sd(DF$I); eQ[src_index] <- sd(DF$Q); eU[src_index] <- sd(DF$U)
+if(argList$Table){
+	for(freq_index in 1:numFreq){
+		medI <- medQ <- medU <- eI <- eQ <- eU <- numObs <- rep(NA, numSrc)
+    	lastDateIndex <- which.max(as.numeric(FLDF[FLDF$Freq == freqList[freq_index],]$Date))
+		for(src_index in 1:numSrc){
+			DF <- FLDF[((FLDF$Src == sourceList[src_index]) & (FLDF$Freq == freqList[freq_index]) & (difftime(Today, FLDF$Date, units="days") < 60)) , ]
+        	if(nrow(DF) == 0){ next }
+			medI[src_index] <- median(DF$I); medQ[src_index] <- median(DF$Q); medU[src_index] <- median(DF$U)
+			numObs[src_index] <- length(DF$eI)
+			if(numObs[src_index] == 1){
+				eI[src_index] <- DF$eI; eQ[src_index] <- DF$eQ; eU[src_index] <- DF$eU
+			} else {
+				eI[src_index] <- sd(DF$I); eQ[src_index] <- sd(DF$Q); eU[src_index] <- sd(DF$U)
+			}
 		}
+		polDF <- na.omit(data.frame( Src=as.character(sourceList), numObs=numObs, I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi, sdEVPA=90.0*sqrt(eQ^2 + eU^2)/sqrt(medQ^2 + medU^2)/pi ))
+		polDF <- polDF[order(polDF$P, decreasing=T),]
+		rownames(polDF) <- c(1:nrow(polDF))
+		#-------- HTML pol-table
+		CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : 60-day median as of %s / ', freqList[freq_index], as.character(Today)),sep='')
+    	CaptionText <- paste(CaptionText, '<a href="', FluxDataURL, FLDF[FLDF$Freq == freqList[freq_index],]$File[lastDateIndex], '" target="_new">', 'Last Observation on ', as.character(FLDF[FLDF$Freq == freqList[freq_index],]$Date[lastDateIndex], tz='UTC'), "</p>", sep='') 
+		cat(sprintf('Frequency %.1f GHz : 60-day median as of %s\n', freqList[freq_index], as.character(Today)))
+		cat('Source       #obs   I [Jy]   Q [Jy]   U [Jy]    %Pol  EVPA [deg]\n')
+		for(index in 1:nrow(polDF)){
+			pDF <- polDF[index,]
+			cat(sprintf("%10s   (%2d)   %6.2f   %6.2f   %6.2f   %6.1f   %6.1f   %6.1f\n", pDF$Src, pDF$numObs, pDF$I, pDF$Q, pDF$U, pDF$p, pDF$EVPA, pDF$sdEVPA))
+		}
+		names(polDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)', 'sd(EVPA)')
+		polDF$Source <- paste('<a href="', polDF$Source, '.flux.html" target="_new" >', polDF$Source, ' </a>', sep='')
+		htmlFile <- sprintf('Stokes%.0fGHz.html', freqList[freq_index])
+		html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
+		html.table <- paste(print(xtable(polDF, digits=c(0,0,0,3,3,3,3,3,3,3,3,1,1,1)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
+		html.body <- paste("<body>", CaptionText, html.table, "</body>")
+		write(paste(html.head, html.body, sep='\n'), htmlFile)
 	}
-	polDF <- na.omit(data.frame( Src=as.character(sourceList), numObs=numObs, I=medI, eI = eI, Q=medQ, eQ = eQ, U=medU, eU = eU, P=sqrt(medQ^2 + medU^2), eP=sqrt(eQ^2 + eU^2)/medI, p=100.0*sqrt(medQ^2 + medU^2)/medI, EVPA=90.0*atan2(medU, medQ)/pi, sdEVPA=90.0*sqrt(eQ^2 + eU^2)/sqrt(medQ^2 + medU^2)/pi ))
-	polDF <- polDF[order(polDF$P, decreasing=T),]
-	rownames(polDF) <- c(1:nrow(polDF))
-	#-------- HTML pol-table
-	CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : 60-day median as of %s / ', freqList[freq_index], as.character(Today)),sep='')
-    CaptionText <- paste(CaptionText, '<a href="', FluxDataURL, FLDF[FLDF$Freq == freqList[freq_index],]$File[lastDateIndex], '" target="_new">', 'Last Observation on ', as.character(FLDF[FLDF$Freq == freqList[freq_index],]$Date[lastDateIndex]), "</p>", sep='') 
-	cat(sprintf('Frequency %.1f GHz : 60-day median as of %s\n', freqList[freq_index], as.character(Today)))
-	cat('Source       #obs   I [Jy]   Q [Jy]   U [Jy]    %Pol  EVPA [deg]\n')
-	for(index in 1:nrow(polDF)){
-		pDF <- polDF[index,]
-		cat(sprintf("%10s   (%2d)   %6.2f   %6.2f   %6.2f   %6.1f   %6.1f   %6.1f\n", pDF$Src, pDF$numObs, pDF$I, pDF$Q, pDF$U, pDF$p, pDF$EVPA, pDF$sdEVPA))
-	}
-	names(polDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)', 'sd(EVPA)')
-	polDF$Source <- paste('<a href="', polDF$Source, '.flux.html" target="_new" >', polDF$Source, ' </a>', sep='')
-	htmlFile <- sprintf('Stokes%.0fGHz.html', freqList[freq_index])
-	html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
-	html.table <- paste(print(xtable(polDF, digits=c(0,0,0,3,3,3,3,3,3,3,3,1,1,1)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
-	html.body <- paste("<body>", CaptionText, html.table, "</body>")
-	write(paste(html.head, html.body, sep='\n'), htmlFile)
 }
 #-------- Time-series plots
 bandColor <- brewer.pal(3, "Dark2")
 for(src_index in 1:numSrc){
     rm(DF)
 	DF <- FLDF[FLDF$Src == sourceList[src_index],]
-	DF$Date <- as.POSIXct(DF$Date)
+	DF$Date <- as.POSIXct(DF$Date, tz='GMT')
 	plot_I <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~I, type="scatter", mode="markers", color=paste("I", freqLabel[1]), colors=bandColor, error_y = list(array=~eI, thickness=1, width=0))
     if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[2],], color=paste("I", freqLabel[2]))}
     if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[3],], color=paste("I", freqLabel[3]))}
@@ -140,8 +162,15 @@ for(src_index in 1:numSrc){
 
 	allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=T, titleY=T)
 	htmlFile <- sprintf("%s.flux.html", sourceList[src_index])
-	htmlwidgets::saveWidget(allPlot, htmlFile)
+	htmlwidgets::saveWidget(allPlot, htmlFile, selfcontained=FALSE )
 	rm(plot_I); rm(plot_P); rm(plot_A); rm(allPlot); rm(htmlFile)
+}
+text_sd <- sprintf('cp -r %s.flux_files common.flux_files', sourceList[1])
+system(text_sd)
+system('rm -rf J*.flux_files')
+for(src_index in 1:numSrc){
+	text_sd <- sprintf('ln -s common.flux_files %s.flux_files', sourceList[src_index])
+	system(text_sd)
 }
 #-------- Source 60-day statistics
 I100 <- Q100 <- U100 <- numeric(numSrc)
@@ -202,6 +231,6 @@ for(band in c(1,3,4,5,6,7,8,9)){
 	pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
 	pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (30-day statistics)', band, as.character(Today)))
 	htmlFile <- sprintf("Band%d_LSTplot.html", band)
-	htmlwidgets::saveWidget(pLST, htmlFile)
+	htmlwidgets::saveWidget(pLST, htmlFile, selfcontained=FALSE)
 	rm(plotDF)
 }

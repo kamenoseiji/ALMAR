@@ -1,17 +1,33 @@
 #mkdir WORK
 rsync -auvz skameno@ssh.alma.cl:/home/skameno/public_html/Grid/Stokes/ WORK/
 cd WORK
-#ls *Flux.log > fileList
+rm *.pdf
+rm *.table
+rm *.CSV
+rm *.html
+rm -rf *_files
+rm -rf AMAPOLA
 ls -la *Flux.log | awk '{if ($5 >= 1024) print $9}' > fileList
-Rscript ../StokesFluxStat.R fileList
-Rscript ../ReadAeff.R fileList
-scp Flux.Rdata skameno@ssh.alma.cl:/home/skameno/public_html/Grid/Stokes/
-scp AeDF.Rdata skameno@ssh.alma.cl:/home/skameno/public_html/Grid/Stokes/
-scp Dterm.Rdata skameno@ssh.alma.cl:/home/skameno/public_html/Grid/Stokes/
-scp amapola.txt skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
-Rscript ../PlotFlux.R
-scp PolQuery.CSV skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
-scp *.html skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/
-scp *.pdf skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/PDF/
-scp *.table skameno@ssh.alma.cl:/home/skameno/public_html/AMAPOLA/Table/
+/usr/local/bin/Rscript ../StokesFluxStat.R fileList
+/usr/local/bin/Rscript ../ReadAeff.R fileList
+mkdir AMAPOLA
+mkdir AMAPOLA/PDF
+mkdir AMAPOLA/Table
+cp ../HTML/*.txt AMAPOLA
+cp ../HTML/*.html AMAPOLA
+cp -r ../HTML/resources AMAPOLA
+cp -r ../HTML/images AMAPOLA
+cp Flux.Rdata AMAPOLA
+cp AeDF.Rdata AMAPOLA
+cp Dterm.Rdata AMAPOLA
+cp amapola.txt AMAPOLA
+/usr/local/bin/Rscript ../PlotFlux.R
+mv PolQuery.CSV AMAPOLA
+mv *.pdf AMAPOLA/PDF
+mv *.table AMAPOLA/Table
+mv *.html AMAPOLA
+mv common.flux_files AMAPOLA
+mv J*.flux_files AMAPOLA
+mv Band*LSTplot_files AMAPOLA
+rsync -a --safe-links AMAPOLA skameno@ssh.alma.cl:/home/skameno/public_html/
 cd ..

@@ -176,7 +176,7 @@ AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(
 FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4', 'Date')
 DtermDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DtermDF) <- FMT
 for(fileName in fileList){
-	cat(fileName); cat('\n')
+	#cat(fileName); cat('\n')
     fileLines <- readLines(fileName)
     if(length(fileLines) < 10){ next }
     if(fileLines[1] == ''){ next }
@@ -208,6 +208,9 @@ for(fileName in fileList){
 	    DtermDF <- rbind(DtermDF, Ddf)
     }
 }
+AeDF <- AeDF[complete.cases(AeDF$AeX),]
+AeDF <- AeDF[complete.cases(AeDF$AeY),]
+AeDF <- AeDF[((AeDF$AeX > 25.0) & (AeDF$AeX < 100.0) & (AeDF$AeY > 25.0) & (AeDF$AeY < 100.0)),]
 AeDF <- AeDF[complete.cases(AeDF$Date),]
 AeDF <- AeDF[order(AeDF$Date), ]
 DtermDF <- DtermDF[complete.cases(DtermDF$Date),]

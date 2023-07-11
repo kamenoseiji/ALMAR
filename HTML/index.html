@@ -1,0 +1,100 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html lang="en">
+<head>
+<meta name="robots" content="all" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="Keywords" content="Radio Astronomy, Polarimetry, ALMA">
+<meta name="Description" content="Polarimetry Commissioning">
+<link rel="stylesheet" type="text/css" href="../resources/amapola.css">
+<link rel="shortcut icon" href="favicon.ico">
+<link rel="contents" href="./index.html">
+<title>AMAPOLA</title>
+</head>
+<body>
+<h1 class="title1"><a name="top">AMAPOLA</a></h1>
+<h2 class="title2">Analytic Matrix for ALMA POLArimetry</h2>
+<p class="navigation">&nbsp;</p>
+<table class="table_text" summary="abstract"><tr>
+    <td class="td_text"><IMG SRC = "images/amapola.jpg" HEIGHT = "240" ALT = "amapola"></td>
+    <td class="td_text"><p class="abstract">AMAPOLA is a set of CASA-friendly Python scripts for ALMA polarimetry. It is capable to reduce full-Stokes polarimetry of <a href="http://www.alma.cl/~ahales/cal_survey/plots/calsurvey_monitoring_B3.html">Grid Survey observations</a>, calibrator survey executions, and spectral-line polarimetry. The script involves D-term matrix solution without omitting D<sup>2</sup> terms and employs M&uuml;ller matrix determination of Stokes parameters with D-term correction.</p></td>
+    <td class="td_text"><IMG SRC = "images/beamMap.png" HEIGHT = "240" ALT = "Beam Map"></td>
+</tr></table>
+
+
+<hr>
+<!---- Pol-Calibrator selector ---->
+<h3 class="title3">Expected XY cross correlation amplitudes</h3>
+<table class="eventable" summary="XY corr plots">
+<tr><td><a href="Band1_LSTplot.html" target="_new"><img src="images/Band1_thumb.png" alt="Band-1" width="240" class="clickable"></a></td><td><a href="Band3_LSTplot.html" target="_new"><img src="images/Band3_thumb.png" alt="Band-3" width="240" class="clickable"></a></td><td><a href="Band4_LSTplot.html" target="_new"><img src="images/Band4_thumb.png" alt="Band-4" width="240" class="clickable"></a></td><td><a href="Band5_LSTplot.html" target="_new"><img src="images/Band5_thumb.png" alt="Band-5" width="240" class="clickable"></a></td></tr>
+<tr><td><a href="Band6_LSTplot.html" target="_new"><img src="images/Band6_thumb.png" alt="Band-6" width="240" class="clickable"></a></td><td><a href="Band7_LSTplot.html" target="_new"><img src="images/Band7_thumb.png" alt="Band-7" width="240" class="clickable"></a></td><td><a href="Band8_LSTplot.html" target="_new"><img src="images/Band8_thumb.png" alt="Band-8" width="240" class="clickable"></a></td><td><a href="Band9_LSTplot.html" target="_new"><img src="images/Band9_thumb.png" alt="Band-9" width="240" class="clickable"></a></td></tr>
+</table>
+<a href="XYcorrPlots.html"><p>Instruction for the XY cross correlation plots</p></a>
+
+<hr>
+<!---- Recent Grid Survey Results ---->
+<h3 class="title3">Recent Polarimetry with AMAPOLA for Grid Survey Sources</h3>
+<p>Ordered by polarized flux density</p>
+<p class="warning">These measurements are only for planning. DO NOT USE them for science publications!</p>
+<p><object data="Stokes97GHz.html" type="text/html" width="800" height="480"><a href="Stokes98GHz.html">Band-3 Stokes Parameters</a></object></p>
+
+<p><object data="Stokes233GHz.html" type="text/html" width="800" height="480"><a href="Stokes233GHz.html">Band-6 Stokes Parameters</a></object></p>
+
+<p><object data="Stokes343GHz.html" type="text/html" width="800" height="480"><a href="Stokes344GHz.html">Band-7 Stokes Parameters</a></object></p>
+
+<hr>
+<!---- Link to text data ---->
+<p><a href="amapola.txt">Link to text data</a></p>
+
+<hr>
+<!---- Link to R data frame ---->
+<p><a href="Flux.Rdata">Link to Flux.Rdata</a>, a data frame readable with the R statistical language. In R, it is also accessible by the command:</p>
+<p class="codeStyle">load(url("https://www.alma.cl/~skameno/AMAPOLA/Flux.Rdata"))</p>
+<p>then the data frame "FLDF" records all of Stokes parameters.</p>
+
+<hr>
+<h3 class="title3">Related Documents</h3>
+<table class="table_text" summary="Main Contents">
+<tr>
+
+<!---- Menu : Features ---->
+<td class="td_text">
+<table class="oddtable" summary="Features">
+  <tr><th class="th_text" colspan="2">Features</th></tr>
+  <tr><td class="td_item">&#8226; <a href="https://jira.alma.cl/secure/attachment/334830/PolGrid20180110.pdf">Polarimetry for Grid Survey</a></td></tr>
+  <tr><td class="td_item">&#8226; <!-- a href="https://github.com/kamenoseiji/ALMA_SV"-->Polarimetry for Spectral Lines</td></tr>
+  <tr><td class="td_item">&#8226; <a href="PolarizedBeamProc.html">Polarized Beam Characterization</a></td></tr>
+  <tr><td class="td_item">&#8226; <a href="D-termTransferMethod.html">D-term transfer</a></td></tr>
+</table>
+</td>
+
+<!---- Menu : Instructions ---->
+<td class="td_text">
+<table class="oddtable" summary="Instructions">
+  <tr><th class="th_text" colspan="2">Instructions</th></tr>
+  <tr><td class="td_item">&#8226; <a href="http://www.alma.cl/~skameno/Documents/aprioriFlux.html">A priori flux measurements for general science SB</a></td></tr>
+</table>
+</td>
+
+<!---- Menu : Reports ---->
+<td class="td_text">
+<table class="oddtable" summary="Reports">
+  <tr><th class="th_text" colspan="2">Reports</th></tr>
+  <tr><td class="td_item">&#8226; <a href="http://www.alma.cl/~skameno/POLBEAM/PolBeam20160923.pdf">ALMA Polarization Beam Characterization</a></td></tr>
+  <tr><td class="td_item">&#8226; <a href="http://www.alma.cl/~skameno/POL/ShortPOL/ShortPolCal20170830.pdf">Performance of short calibration scheme</a></td></tr>
+</table>
+</td>
+
+<!---- Menu : Repository ---->
+<td class="td_text">
+<table class="oddtable" summary="Repository">
+  <tr><th class="th_text" colspan="2">Repository</th></tr>
+  <tr><td class="td_item">&#8226; <a href="https://github.com/kamenoseiji/ALMA_SV">GitHub repository</a></td></tr>
+</table>
+</td>
+</tr>
+</table>
+
+
+</body>
+</html>

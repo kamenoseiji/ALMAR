@@ -1,3 +1,12 @@
+
+
+KalmanPredict <- function(DF, epoch){
+}
+
+load('Flux.Rdata')
+J0006B3 <- FLDF[FLDF$Source == 'J0006-0623' && 
+
+if(0){
 load('Flux.Rdata')
 sourceList <- sort(as.character(unique(FLDF$Src)))
 pdf('StokesV.pdf')
@@ -34,3 +43,4 @@ hist(100.0*abs(SrcVfrac), breaks=c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.
 hist(abs(SrcVfrac) / SrcVe, breaks=c(0,1,2,3,4,5,100), col = "#0000ff40", border = "#0000ff", freq=FALSE, xlim=c(0, 5.0), xlab='| Stokes  V |/ sigma', main=sprintf('Significance of Circular Polarization (%.1f GHz)', FLDF$Freq[1]))
 
 dev.off()
+}

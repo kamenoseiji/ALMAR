@@ -94,14 +94,14 @@ readStokesSection <- function(Lines, bandID=3){
             SBfreq <- append(SBfreq, c(mean(spwFreq[1:2]), mean(spwFreq[3:4])))
         }
         FREQ <- append(FREQ, SBfreq)
-        preI <- predict(lm(data=data.frame(freq=spwFreq, I=spwI, eI=spweI), formula=I~freq, weights=1.0/eI^2), new=data.frame(freq=SBfreq), interval='confidence')
-        preQ <- predict(lm(data=data.frame(freq=spwFreq, Q=spwQ, eQ=spweQ), formula=Q~freq, weights=1.0/eQ^2), new=data.frame(freq=SBfreq), interval='confidence')
-        preU <- predict(lm(data=data.frame(freq=spwFreq, U=spwU, eU=spweU), formula=U~freq, weights=1.0/eU^2), new=data.frame(freq=SBfreq), interval='confidence')
-        preV <- predict(lm(data=data.frame(freq=spwFreq, V=spwV, eV=spweV), formula=V~freq, weights=1.0/eV^2), new=data.frame(freq=SBfreq), interval='confidence')
-        I <- append(I, preI[1:numSubBand[bandID]]); eI <- append(eI, 0.25*(preI[(2*numSubBand[bandID]+1):(3*numSubBand[bandID])]-preI[(numSubBand[bandID]+1):(numSubBand[bandID]*2)]))
-        Q <- append(Q, preQ[1:numSubBand[bandID]]); eQ <- append(eQ, 0.25*(preQ[(2*numSubBand[bandID]+1):(3*numSubBand[bandID])]-preQ[(numSubBand[bandID]+1):(numSubBand[bandID]*2)]))
-        U <- append(U, preU[1:numSubBand[bandID]]); eU <- append(eU, 0.25*(preU[(2*numSubBand[bandID]+1):(3*numSubBand[bandID])]-preU[(numSubBand[bandID]+1):(numSubBand[bandID]*2)]))
-        V <- append(V, preV[1:numSubBand[bandID]]); eV <- append(eV, 0.25*(preV[(2*numSubBand[bandID]+1):(3*numSubBand[bandID])]-preV[(numSubBand[bandID]+1):(numSubBand[bandID]*2)]))
+        preI <- predict(lm(data=data.frame(freq=spwFreq, I=spwI, eI=spweI), formula=I~freq, weights=1.0/eI^2), new=data.frame(freq=SBfreq), interval='confidence', se.fit=T)
+        preQ <- predict(lm(data=data.frame(freq=spwFreq, Q=spwQ, eQ=spweQ), formula=Q~freq, weights=1.0/eQ^2), new=data.frame(freq=SBfreq), interval='confidence', se.fit=T)
+        preU <- predict(lm(data=data.frame(freq=spwFreq, U=spwU, eU=spweU), formula=U~freq, weights=1.0/eU^2), new=data.frame(freq=SBfreq), interval='confidence', se.fit=T)
+        preV <- predict(lm(data=data.frame(freq=spwFreq, V=spwV, eV=spweV), formula=V~freq, weights=1.0/eV^2), new=data.frame(freq=SBfreq), interval='confidence', se.fit=T)
+        I <- append(I, preI$fit[1:numSubBand[bandID]]); eI <- append(eI, preI$se.fit[1:numSubBand[bandID]])
+        Q <- append(Q, preQ$fit[1:numSubBand[bandID]]); eQ <- append(eQ, preQ$se.fit[1:numSubBand[bandID]])
+        U <- append(U, preU$fit[1:numSubBand[bandID]]); eU <- append(eU, preU$se.fit[1:numSubBand[bandID]]) 
+        V <- append(V, preV$fit[1:numSubBand[bandID]]); eV <- append(eV, preV$se.fit[1:numSubBand[bandID]]) 
 	}
 	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
 }
