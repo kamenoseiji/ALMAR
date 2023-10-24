@@ -2,6 +2,7 @@ library(VGAM)       # for Rice distribution
 Sys.setenv(TZ="UTC")
 sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
+minAntNum <- 7		   # Minimum number of antennas
 numSubBand = c(3,3,3,1,1,1,1,1,1,1) # Number of sub-bands for Band[1-10]
 
 sourceMatch <- function(sourceName){
@@ -183,6 +184,15 @@ Arguments <- 'fileList'
 fileList <- parseArg(Arguments)
 #FMT <- c('Src', 'EL', 'I', 'Q', 'U', 'V', 'eI', 'eQ', 'eU', 'eV', 'EL')
 #FLDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(FLDF) <- FMT
+#-------- Filter by number of used antennas
+for(index in 1:length(fileList)){
+	fileName <- fileList[index]
+    fileLines <- removeBlank(readLines(fileName))
+	antNum <- length(grep('CM', fileLines)) + length(grep('PM', fileLines)) + length(grep('DA', fileLines)) + length(grep('DV', fileLines))
+	if( (antNum %% 2) == 0){	antNum <- antNum / 2	}
+	if(antNum < minAntNum){	fileList[index] <- 'FlaggedByAntNum' }
+}
+fileList <- fileList[fileList != 'FlaggedByAntNum']
 #-------- Count number of records
 recordNum <- 0
 for(fileName in fileList){

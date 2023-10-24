@@ -1,6 +1,7 @@
 #mkdir WORK
 rsync -auvz skameno@ssh.alma.cl:/home/skameno/public_html/Grid/Stokes/ WORK/
 cd WORK
+rm *.Rdata
 rm *.pdf
 rm *.table
 rm *.CSV
