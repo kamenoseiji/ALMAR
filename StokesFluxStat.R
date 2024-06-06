@@ -1,3 +1,4 @@
+library(parallel)   # multicore parallelization
 library(VGAM)       # for Rice distribution
 Sys.setenv(TZ="UTC")
 sysIerr <- 0.005       # temporal Stokes I systematic error
@@ -173,9 +174,10 @@ checkTrec <- function(DF){
 }
 
 #-------- remove blank lines
+
+#-------- remove blank lines
 removeBlank <- function(Lines){
-	lineLength <- nchar(Lines)
-	index <- which(lineLength > 1)
+    Lines <- Lines[which(nchar(Lines) > 1)]
 	return(Lines[index])
 }
 #-------- Start program
@@ -225,19 +227,6 @@ for(file_index in 1:length(DFList)){
     FLDF[FLDFpointer:(FLDFpointer + recordNum - 1),] <- DFList[[file_index]]
     FLDFpointer <- FLDFpointer + recordNum
 }
-#
-#for(fileName in fileList){
-#    bandPointer <- regexpr("RB_[0-10]", fileName)[1]
-#    bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
-#    fileLines <- removeBlank(readLines(fileName))
-#	DF <- readStokesSection(fileLines, bandID)
-#    if(nrow(DF) == 0){  next}
-#	DF$File <- fileName
-#	if(anyNA(DF)){ cat(sprintf('NA detected in %s\n', fileName)) }
-#    recordNum <- nrow(DF)
-#    FLDF[FLDFpointer:(FLDFpointer + recordNum - 1),] <- DF
-#    FLDFpointer <- FLDFpointer + recordNum
-#}
 FLDF <- na.omit(FLDF)
 #-------- Filter impossible records out
 FLDF <- FLDF[FLDF$I > 2.0* FLDF$eI, ]       # too large error
