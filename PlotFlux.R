@@ -43,8 +43,9 @@ FLDF$Band <- as.integer(substr(FLDF$File, pos+3, pos+4))
 FLDF$BandPA <- BandPA[FLDF$Band]
 FLDF$errU <- FLDF$eP_upper - FLDF$P
 FLDF$errL <- FLDF$P - FLDF$eP_lower
-index <- which((FLDF$Band == 3) & (abs(FLDF$Freq - 97.45) > 1.0))
-FLDF <- FLDF[-index,]
+FLDF <- FLDF[((FLDF$Band != 3) | (abs(FLDF$Freq - 97.45) < 1.0)),]
+#index <- which((FLDF$Band == 3) & (abs(FLDF$Freq - 97.45) > 1.0))
+#FLDF <- FLDF[-index,]
 #-------- Plot LST
 plotLST <- function(DF, band){
     pDF <- data.frame()
@@ -94,8 +95,8 @@ DecList<- DecList + sign(DecList)* as.numeric(substring(sourceList, 9,10))/60.0
 DecList<- DecList / 180 * pi # DEC in [rad]
 
 #-------- Freq List
-bandList <- c(3,6,7)
-FLDF <- FLDF[FLDF$Band %in% c(3,6,7),]
+bandList <- c(1,3,4,6,7)
+FLDF <- FLDF[FLDF$Band %in% bandList,]
 numFreq <- length(bandList); freqList <- numeric(numFreq)
 for(band_index in 1:length(bandList)){
     freqList[band_index] <- median(FLDF[FLDF$Band == bandList[band_index],]$Freq)
@@ -140,24 +141,33 @@ if(argList$Table){
 	}
 }
 #-------- Time-series plots
-bandColor <- brewer.pal(3, "Dark2")
+bandColor <- brewer.pal(numFreq, "Dark2")
 for(src_index in 1:numSrc){
     rm(DF)
 	DF <- FLDF[FLDF$Src == sourceList[src_index],]
 	DF$Date <- as.POSIXct(DF$Date, tz='GMT')
 	plot_I <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~I, type="scatter", mode="markers", color=paste("I", freqLabel[1]), colors=bandColor, error_y = list(array=~eI, thickness=1, width=0))
-    if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[2],], color=paste("I", freqLabel[2]))}
-    if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[3],], color=paste("I", freqLabel[3]))}
+    #if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[2],], color=paste("I", freqLabel[2]))}
+    #if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[3],], color=paste("I", freqLabel[3]))}
+	for(freq_index in 2:numFreq){
+    	if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[freq_index],], color=paste("I", freqLabel[freq_index]))}
+	}
 	plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero', hoverformat='.3f'), title=sourceList[src_index])
 
 	plot_P <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~P, type="scatter", mode="markers", color=paste("P",freqLabel[1]), colors=bandColor, error_y = list(symmetric=FALSE, array=~errU, arrayminus=~errL, thickness=1, width=0))
-    if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[2],], color=paste("P",freqLabel[2]))}
-    if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[3],], color=paste("P",freqLabel[3]))}
+    #if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[2],], color=paste("P",freqLabel[2]))}
+    #if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[3],], color=paste("P",freqLabel[3]))}
+	for(freq_index in 2:numFreq){
+    	if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[freq_index],], color=paste("P",freqLabel[freq_index]))}
+	}
 	plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero', hoverformat='.3f'))
 
 	plot_A <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", color=paste("EVPA",freqLabel[1]), colors=bandColor, error_y = list(array=~eEVPA*180/pi, thickness=1, width=0))
-    if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[2],], color=paste("EVPA",freqLabel[2]))}
-    if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[3],], color=paste("EVPA",freqLabel[3]))}
+    #if(nrow(DF[DF$Band == bandList[2],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[2],], color=paste("EVPA",freqLabel[2]))}
+    #if(nrow(DF[DF$Band == bandList[3],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[3],], color=paste("EVPA",freqLabel[3]))}
+	for(freq_index in 2:numFreq){
+    	if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[freq_index],], color=paste("EVPA",freqLabel[freq_index]))}
+	}
 	plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91), hoverformat='.1f'))
 
 	allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=T, titleY=T)

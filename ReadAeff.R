@@ -11,36 +11,34 @@ parseArg <- function( args ){
 #-------- Find Calibrator name
 findCalibrator <- function( Lines ){
 	if( length(grep(" Aeff", Lines)) == 0){ return(list(0))}
-    bestR <- -1.0
     for(SSO in SSOlist){
-        SSOpointers <- grep(paste(SSO, 'EL'), Lines)
-        for( SSOpointer in SSOpointers ){
-            if(length(grep('Model I', Lines[SSOpointer+1])) == 0){ next }
+        SSOpointer <- grep(paste(SSO, 'EL'), Lines)
+        #for( SSOpointer in SSOpointers ){
+        #    if(length(grep('Model I', Lines[SSOpointer+1])) == 0){ next }
+        #}
+        #if(length(grep('Model I', Lines[SSOpointer+1])) == 0){ next }
+        if(length(SSOpointer) == 0){ next}
+        datePointer <- SSOpointer + 3
+        StokesI <- errI <- numeric(0)
+        while(length(grep('SPW', Lines[datePointer]) ) > 0){
+        	lineData <- strsplit(Lines[datePointer], '[ |(|)|z]+')[[1]]
+            if(length(lineData) < 13){ datePointer <- datePointer + 1; next }
+            StokesI <- append(StokesI, as.numeric(lineData[5]))
+            errI    <- append(errI,    as.numeric(lineData[6]))
+            datePointer <- datePointer + 1
         }
-        if(length(grep('Model I', Lines[SSOpointer+1])) == 0){ next }
-        if(length(SSOpointer) > 0){
-            datePointer <- SSOpointer + 3
-            StokesI <- modelI <- numeric(0)
-            while(length(grep('SPW', Lines[datePointer]) ) > 0){
-                lineData <- strsplit(Lines[datePointer], '[ |(|)|z]+')[[1]]
-                if(length(lineData) < 13){ datePointer <- datePointer + 1; next }
-                StokesI <- append(StokesI, as.numeric(lineData[5]))
-                modelI  <- append(modelI,  as.numeric(lineData[13]))
-                datePointer <- datePointer + 1
-            }
-            if(length(StokesI) < 3){ next }
-            fluxR <- median(StokesI) / median(modelI)
-            if( abs(fluxR - 1.0) < abs(bestR - 1.0) ){
-                bestR <- fluxR
-                fluxCalName <- strsplit(Lines[SSOpointer], '[ |=]+')[[1]][3]
-                EL <- as.numeric(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][5])
-	            scalerUTC <- strptime(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
-            }
-        }
+        if(length(StokesI) < 3){ next }
+        if(median(StokesI) / median(errI) < 5.0){ next }
+        fluxCalName <- strsplit(Lines[SSOpointer], '[ |=]+')[[1]][3]
+        EL <- as.numeric(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][5])
+	    scalerUTC <- strptime(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
     }
-    if( abs(bestR - 1.0) > 0.5 ){ return(list(-1))}
-    sunsetUTC <- getSunlightTimes(as.Date(scalerUTC), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]
-	return(list(calibrator=fluxCalName, EL=EL, UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24, fluxR=bestR))
+	if(exists('scalerUTC')){
+    	sunsetUTC <- getSunlightTimes(as.Date(scalerUTC), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]
+		return(list(calibrator=fluxCalName, EL=EL, UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24))
+	} else {
+		return(list(0))
+	}
 }
 #-------- Read Aeff Section
 readAeffSection <- function(Lines){
@@ -62,7 +60,7 @@ readAeffSection <- function(Lines){
 #-------- Read Aeff Section from a priori calibration
 readAeApriori <- function(Lines){
     pointer <- grep("Use J", Lines)[2]
-    FMT <- c('Ant', 'AeX', 'AeY', 'calibrator', 'EL', 'Date', 'sunset', 'fluxR')
+    FMT <- c('Ant', 'AeX', 'AeY', 'calibrator', 'EL', 'Date', 'sunset')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
     if( length(grep('^[A-Z]', Lines[pointer+1])) == 0 ){ return(DF) }
     strList = strsplit(Lines[pointer], '[ |=]+')[[1]]
@@ -77,8 +75,7 @@ readAeApriori <- function(Lines){
             calibrator = strList[2],
             EL = as.numeric(strList[5]),
             Date = tmpDate,
-            sunset = as.numeric(difftime(tmpDate, getSunlightTimes(as.Date(tmpDate), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]))%%24, 
-            fluxR = 1.0)
+            sunset = as.numeric(difftime(tmpDate, getSunlightTimes(as.Date(tmpDate), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]))%%24)
         DF <- rbind(DF, tmpDF)
         pointer <- pointer + 1
     }
@@ -171,7 +168,7 @@ SPL_period <- function(DF, refPeriod, weight=c(0,0)){
 #Arguments <- commandArgs(trailingOnly = T)
 #fileList <- parseArg(Arguments)
 fileList <- parseArg('fileList')
-FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'fluxR')
+FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset')
 AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4', 'Date')
 DtermDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DtermDF) <- FMT
@@ -188,7 +185,6 @@ for(fileName in fileList){
 	    DF$EL <- CalList$EL
 	    DF$Date <- CalList$UTC
 	    DF$sunset <- CalList$sunset
-	    DF$fluxR <- CalList$fluxR
     } else {
         DF <- readAeApriori(fileLines)
     }
@@ -203,7 +199,6 @@ for(fileName in fileList){
 	    #Ddf$EL <- DF$EL
 	    #Ddf$Date <- DF$Date
 	    #Ddf$sunset <- DF$sunset
-	    #Ddf$fluxR <- DF$fluxR
 	    Ddf$File <- fileName
 	    DtermDF <- rbind(DtermDF, Ddf)
     }
