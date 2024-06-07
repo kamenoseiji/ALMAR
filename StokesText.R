@@ -5,271 +5,85 @@ sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
 minAntNum <- 5		   # Minimum number of antennas
 numSubBand = c(3,3,3,1,1,1,1,1,1,1) # Number of sub-bands for Band[1-10]
-
-sourceMatch <- function(sourceName){
-	sourceDict <- list(
-		c('J0006-0623', 'J0006-063'),
-		c('J0006-0623', '0006-063'),
-		c('J0237+2848', 'J0237+288'),
-		c('J0238+1636', 'J0238+166'),
-		c('J0319+4130', '3c84'),
-		c('J0334-4008', 'J0334-401'),
-		c('J0423-0120', 'J0423-013'),
-		c('J0457+2624', 'J0457+2624_ALMA'),
-		c('J0510+1800', 'J0510+180'),
-		c('J0519-4546', 'J0519-454'),
-		c('J0522-3627', 'J0522-364'),
-		c('J0538-4405', 'J0538-440'),
-		c('J0750+1231', 'J0750+125'),
-		c('J0854+2006', 'J0854+201'),
-		c('J1037-2934', 'J1037-295'),
-		c('J1058+0133', 'J1058+015'),
-		c('J1107-4449', 'J1107-448'),
-		c('J1146+3958', 'J1146+399'),
-		c('J1229+0203', '3c273'),
-		c('J1256-0547', '3c279'),
-		c('J1337-1257', 'J1337-129'),
-		c('J1427-4206', 'J1427-421'),
-		c('J1517-2422', 'J1517-243'),
-		c('J1550+0527', 'J1550+054'),
-		c('J1617-5848', 'J1613-586'),
-		c('J1642+3948', '3c345'),
-		c('J1733-1304', 'J1733-130'), 
-		c('J1751+0939', 'J1751+096'), 
-		c('J1924-2914', 'J1924-292'),
-		c('J2025+3343', 'J2025+337'),
-		c('J2056-4714', 'J2056-472'),
-		c('J2148+0657', 'J2148+069'),
-		c('J2232+1143', 'J2232+117'),
-		c('J2253+1608', '3c454.3'),
-		c('J2258-2758', 'J2258-279'),
-		c('Uranus', 'Uranus_1'))
-	#
-	for(index in 1:length(sourceDict)){ if( !is.na(match(sourceName, sourceDict[[index]]))){ return(sourceDict[[index]][1])} }
-	return(sourceName)
+standardFreq <- list(40.0, 80.0, c(91.5,97.5,103.5), 154.9, 183.0, 233.0, 343.4, 410.2)
+#-------- Band
+getBand <- function(fileName){
+    bandPointer <- as.integer(regexpr("RB_[0-10]", fileName)[1])
+    return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
 }
-#-------- Parse arguments
-parseArg <- function( args ){
-    fileDF <- read.table(args[1])
-    return( as.character(fileDF[[1]]) )
+load('Flux.Rdata')
+predStokes <- function(df){
+    bandID   <- getBand(df$File[1])
+    fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/eI^2)
+    fitQ <- lm(formula=Q ~ Freq, data=df, weight=1.0/eQ^2)
+    fitU <- lm(formula=U ~ Freq, data=df, weight=1.0/eU^2)
+    fitV <- lm(formula=V ~ Freq, data=df, weight=1.0/eV^2)
+    newDF <- data.frame(Src=df$Src[1], Freq = standardFreq[[bandID]], EL=df$EL[1])
+    pred <- as.numeric(predict(fitI, newDF, interval='confidence', level=0.67)); newDF$I <- matrix(pred, ncol=3)[,1]; newDF$eI <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+    pred <- as.numeric(predict(fitQ, newDF, interval='confidence', level=0.67)); newDF$Q <- matrix(pred, ncol=3)[,1]; newDF$eQ <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+    pred <- as.numeric(predict(fitU, newDF, interval='confidence', level=0.67)); newDF$U <- matrix(pred, ncol=3)[,1]; newDF$eU <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+    pred <- as.numeric(predict(fitV, newDF, interval='confidence', level=0.67)); newDF$V <- matrix(pred, ncol=3)[,1]; newDF$eV <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+    return(newDF)
 }
 
-#-------- Find Stokes Parameters
-#readStokesSection <- function(Lines, bandID=3){
-#	pointer <- grep("mean ", Lines)
-#    if(length(pointer) == 0){ return(data.frame())} # No available data
-#	srcPointer <- grep("^ [0-999]", Lines)
-#	numSource <- length(pointer)
-#    spw_pointer <- grep("^ SPW[0-99]", Lines)
-#    spwNum <- ceiling(length(spw_pointer) / length(srcPointer))
-#    #if(bandID <= 3){ numSubBand <- 3 } else { numSubBand <- 1}
-#	StokesI <- StokesQ <- StokesU <- StokesV <- numeric(numSource* numSubBand[bandID])
-#	errI <- errQ <- errU <- errV <- numeric(numSource* numSubBand[bandID])
-#	FREQ <- I <- Q <- U <- V <- numeric(0)
-#	eI <- eQ <- eU <- eV <- numeric(0)
-#	srcList <- character(0); EL <- numeric(0)
-#	srcUTC <- as.Date(as.character(NULL), tz='UTC')
-#	for(srcIndex in 1:numSource){
-#        spwPointerList <- spw_pointer[which((spw_pointer < pointer[srcIndex]) & (spw_pointer > srcPointer[srcIndex]))]
-#        spwFreq <- spwI <- spwQ <- spwU <- spwV <- spweI <- spweQ <- spweU <- spweV <- numeric(spwNum)
-#        for(spw_index in 1:spwNum){
-#		    lineElements <- strsplit(Lines[spwPointerList[spw_index]], '[ |(|)|z]+')[[1]]
-#            spwFreq[spw_index] <- as.numeric(lineElements[3])
-#            if(length(lineElements) > 12){
-#                spwI[spw_index] <- as.numeric(lineElements[5]); spweI[spw_index] <- as.numeric(lineElements[6]) + 1.0e-4
-#                spwQ[spw_index] <- as.numeric(lineElements[7]); spweQ[spw_index] <- as.numeric(lineElements[8]) + 1.0e-4
-#                spwU[spw_index] <- as.numeric(lineElements[9]); spweU[spw_index] <- as.numeric(lineElements[10]) + 1.0e-4
-#                spwV[spw_index] <- as.numeric(lineElements[11]); spweV[spw_index] <- as.numeric(lineElements[12]) + 1.0e-4
-#            } else {
-#                spwI[spw_index] <- spwQ[spw_index] <- spwU[spw_index] <- spwV[spw_index] <- NA
-#            }
-#        }
-#        if(sum(!is.na(spwI)) < 3){ next }
-#        SBfreq <- median(spwFreq)
-#		srcList <- append(srcList, as.character(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][3]) )
-#		srcUTC <- append(srcUTC, strptime(strsplit(Lines[srcPointer[srcIndex]], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz='UTC'))
-#		EL <- append(EL, as.numeric(strsplit(Lines[srcPointer[srcIndex]], '[ |=]+')[[1]][5]))
-#        if( numSubBand[bandID] == 3){
-#		    srcList <- append(srcList, rep(as.character(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][3]),2) )
-#		    srcUTC <- append(srcUTC, rep(strptime(strsplit(Lines[pointer[srcIndex] - spwNum - 4], ' +')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz='UTC'),2))
-#		    EL <- append(EL, rep(as.numeric(strsplit(Lines[pointer[srcIndex] - spwNum - 4], '[ |=]+')[[1]][5]), 2))
-#            SBfreq <- append(SBfreq, c(mean(spwFreq[1:2]), mean(spwFreq[3:4])))
-#        }
-#        FREQ <- append(FREQ, SBfreq)
-#        preI <- predict(lm(data=data.frame(freq=spwFreq, I=spwI, eI=spweI), formula=I~freq, weights=1.0/eI^2), new=data.frame(freq=SBfreq), interval='confidence', se.fit=T)
-#        preQ <- predict(lm(data=data.frame(freq=spwFreq, Q=spwQ, eQ=spweQ), formula=Q~freq, weights=1.0/eQ^2), new=data.frame(freq=SBfreq), interval='confidence', se.fit=T)
-#        preU <- predict(lm(data=data.frame(freq=spwFreq, U=spwU, eU=spweU), formula=U~freq, weights=1.0/eU^2), new=data.frame(freq=SBfreq), interval='confidence', se.fit=T)
-#        preV <- predict(lm(data=data.frame(freq=spwFreq, V=spwV, eV=spweV), formula=V~freq, weights=1.0/eV^2), new=data.frame(freq=SBfreq), interval='confidence', se.fit=T)
-#        I <- append(I, preI$fit[1:numSubBand[bandID]]); eI <- append(eI, preI$se.fit[1:numSubBand[bandID]])
-#        Q <- append(Q, preQ$fit[1:numSubBand[bandID]]); eQ <- append(eQ, preQ$se.fit[1:numSubBand[bandID]])
-#        U <- append(U, preU$fit[1:numSubBand[bandID]]); eU <- append(eU, preU$se.fit[1:numSubBand[bandID]]) 
-#        V <- append(V, preV$fit[1:numSubBand[bandID]]); eV <- append(eV, preV$se.fit[1:numSubBand[bandID]]) 
-#	}
-#	return(data.frame(Src=as.character(srcList), Freq=FREQ, EL=EL, I=I, Q=Q, U=U, V=V, eI=eI, eQ=eQ, eU=eU, eV=eV, Date=srcUTC))
-#}
-readStokesSection <- function(fileName){
-    fileLines <- removeBlank(readLines(fileName))
-    #---- Scan Entries
-    scanPointer   <- grep('EL=', fileLines)
-    scanEntryList <- fileLines[scanPointer]
-    srcVec <- as.character(sapply(scanEntryList, function(scan){ return(strsplit(scan, '[ |=]+')[[1]][3]) }))
-    ELVec  <- as.numeric(sapply(scanEntryList, function(scan){ return(strsplit(scan, '[ |=]+')[[1]][5]) }))
-    UTCVec <- lapply(scanEntryList, function(scan){ return(  strptime(strsplit(scan, '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz='UTC'))})
-    #---- Stokes Parameters
-    StokesPointer <- setdiff(grep('GHz', fileLines) , grep('mean', fileLines))
-    StokesEntryList <- fileLines[StokesPointer]
-    FreqList <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][3])}))
-    IList    <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][5])}))
-    QList    <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][7])}))
-    UList    <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][9])}))
-    VList    <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][11])}))
-    eIList   <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][6])}))
-    eQList   <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][8])}))
-    eUList   <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][10])}))
-    eVList   <- as.numeric(sapply(StokesEntryList, function(scan){ return(strsplit(scan, '[ |(|)|z]+')[[1]][12])}))
-    #---- Expand scan to Stokes
-    entryNum <- length(StokesPointer)
-    srcList <- as.character(entryNum)
-    ELList  <- as.numeric(entryNum)
-    UTCList <- rep(UTCVec[1][[1]], entryNum)
-    for(index in 1:entryNum){
-        pointer <- which(scanPointer == max( scanPointer[scanPointer < StokesPointer[index]]))
-        srcList[index] <- srcVec[pointer]
-        ELList[index]  <- ELVec[pointer]
-        UTCList[index] <- UTCVec[pointer][[1]]
-    }
-    return(data.frame(Src=srcList, Freq=FreqList, EL=ELList, I=IList, Q=QList, U=UList, V=VList, eI=eIList, eQ=eQList, eU=eUList, eV=eVList, Date=UTCList, File=rep(fileName, entryNum)))
-}
-#-------- Generate a data frame from a flux log file
-fileDF <- function(fileName){
-    bandPointer <- regexpr("RB_[0-10]", fileName)[1]
-    bandID <- as.numeric(substr(fileName, bandPointer+3, bandPointer+4))
-    fileLines <- removeBlank(readLines(fileName))
-	return(readStokesSection(fileLines, bandID))
-}
-#-------- Find Calibrator name
-findCalibrator <- function( Lines ){
-	scalerPointer    <- grep("Scaler", Lines)
-	equalizerPointer <- grep("Equalizer", Lines)
-	datePointer      <- grep("Flux Calibrator is", Lines)
-	if( length(scalerPointer) == 0 ){ scalerPointer <- equalizerPointer}
-	scalerName    <- strsplit(Lines[scalerPointer], ' ')[[1]][2]
-	scaleEL <- as.numeric( strsplit(Lines[scalerPointer], ' ')[[1]][5] )
-	equalizerName <- strsplit(Lines[equalizerPointer], ' ')[[1]][2]
-	if(length(datePointer) > 0){
-		scalerUTC <- strptime(strsplit(Lines[datePointer], ' ')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz='UTC')
-	} else {
-		scalerUTC <- strptime(strsplit(Lines[equalizerPointer], ' ')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz='UTC')
-	}
-	return(list(scaler=scalerName, EL=scaleEL, UTC=scalerUTC, equalizer=equalizerName))
+srcDfList <- mclapply(unique(FLDF$Src), function(source){ return(FLDF[FLDF$Src == source,]) })
+for(srcDF in srcDfList){
+    cat(srcDF$Src[1])
+    scanList <- unique(srcDF$Date)
+    scanDFList <- mclapply(scanList, function(scan){ return(srcDF[srcDF$Date == scan,]) })
+    tempList <- mclapply( scanDfList, predStokes )
 }
 
-#-------- Read Trec Section
-readTrecSection <- function(Lines){
-	pointer <- grep(" Trec:", Lines) + 2
-	antName <- character(0)
-	Tr <- list(numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0))
-	Ts <- list(numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0), numeric(0))
-	while(1){
-		elements <- strsplit(Lines[pointer], '[ |K]+')[[1]]
-		if(elements[1] == ''){ break }
-		antName <- append(antName, elements[1])
-		for(spw in 1:8){
-			Tr[[spw]] <- append(Tr[[spw]], as.numeric(elements[spw+2]))
-		}
-		pointer <- pointer + 1
-	}
-	names(Tr) <- c('TrX1', 'TrY1', 'TrX2', 'TrY2', 'TrX3', 'TrY3', 'TrX4', 'TrY4')
-	TrsDF <- data.frame(Ant=antName, TrX1=Tr[[1]], TrY1=Tr[[2]], TrX2=Tr[[3]], TrY2=Tr[[4]], TrX3=Tr[[5]], TrY3=Tr[[6]], TrX4=Tr[[7]], TrY4=Tr[[8]])
-	#
-	pointer <- grep(" Tsys:", Lines) + 1
-	for(ant_index in 1:length(antName)){
-		elements <- strsplit(Lines[pointer + ant_index], '[ |K]+')[[1]]
-		for(spw in 1:8){
-			Ts[[spw]] <- append(Ts[[spw]], as.numeric(elements[spw+2]))
-		}
-	}
-	names(Ts) <- c('TsX1', 'TsY1', 'TsX2', 'TsY2', 'TsX3', 'TsY3', 'TsX4', 'TsY4')
-	TrsDF$TsX1 <- Ts[[1]]; TrsDF$TsY1 <- Ts[[2]]
-	TrsDF$TsX2 <- Ts[[3]]; TrsDF$TsY2 <- Ts[[4]]
-	TrsDF$TsX3 <- Ts[[5]]; TrsDF$TsY3 <- Ts[[6]]
-	TrsDF$TsX4 <- Ts[[7]]; TrsDF$TsY4 <- Ts[[8]]
-	return(TrsDF)
-}
 
-#-------- CheckTrex
-checkTrec <- function(DF){
-	#-------- Check Trec
-	for(col_index in 2:9){ negTrecList <- which(TrsDF[[col_index]] < 0.0) }
-	for(col_index in 2:9){ negTsysList <- which(TrsDF[[col_index+8]] < 0.0) }
-	for(col_index in 2:9){ netTskyList <- which(TrsDF[[col_index+8]] < TrsDF[[col_index]]) }
-	return( list(negTrecList, negTsysList, netTskyList) )
-}
-#-------- Number of antennas
-getAntNum <- function(Lines){
-    D_pointer <- grep('D-term', Lines)
-    if(length(D_pointer) == 0){ return(0) }
-	return(length(grep('CM', Lines[1:D_pointer])) + length(grep('PM', Lines[1:D_pointer])) + length(grep('DA', Lines[1:D_pointer])) + length(grep('DV', Lines[1:D_pointer])))
-}
-#-------- Receiver Band
-getBand <- function(fileList){
-    return(as.integer(sapply(fileList, function(fileName){
-            bandPointer <- as.integer(regexpr("RB_[0-10]", fileName)[1])
-            return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
-        })))
-}
-#-------- Count record number
-countRec <- function(fileName){
-    fileLines <- removeBlank(readLines(fileName))
-    return(length(grep('GHz', fileLines)) - length(grep('mean', fileLines)))
-}
-#-------- remove blank lines
-removeBlank <- function(Lines){ return( Lines[which(nchar(Lines) > 1)]) }
-#-------- Start program
-#Arguments <- commandArgs(trailingOnly = T)
-Arguments <- 'fileList'
-fileList <- parseArg(Arguments)
-#-------- Filter by number of used antennas
-for(index in 1:length(fileList)){
-	fileName <- fileList[index]
-    fileLines <- removeBlank(readLines(fileName))
-	if(getAntNum(fileLines) < minAntNum){	fileList[index] <- 'FlaggedByAntNum' }
-}
-fileList <- fileList[fileList != 'FlaggedByAntNum']
-#-------- Count number of records
-bandID <- getBand(fileList)
-recordNum <- sum(as.integer(sapply(fileList, countRec)))
-#-------- Generage FLDF
-DFList <- lapply(fileList, readStokesSection)
-FLDF <- DFList[[1]]
-for(file_index in 2:length(DFList)){ FLDF <- rbind(FLDF, DFList[[file_index]]) }
-#-------- Filter FLDF
-FLDF <- na.omit(FLDF)
-FLDF <- FLDF[FLDF$I > 2.0* FLDF$eI, ]                       # too large error
-FLDF <- FLDF[FLDF$I^2  > FLDF$Q^2 + FLDF$U^2 +  FLDF$V^2,]  # polarization degree
-FLDF$Src <- as.character(lapply(as.character(FLDF$Src), sourceMatch))
-FLDF$eI <- sqrt(FLDF$eI^2 + (sysIerr*FLDF$I)^2)
-FLDF$Date <- as.POSIXct(FLDF$Date, tz="GMT")
-FLDF <- FLDF[order(FLDF$Date),]
-save(FLDF, file='Flux.Rdata')
 
-#FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
-#sigmaSQ <- sqrt(FLDF$eQ * FLDF$eU + (FLDF$I* sysPerr)^2)
-#FLDF$eP_lower <- qrice(0.15, sigmaSQ, FLDF$P)
-#FLDF[FLDF$P < sigmaSQ,]$eP_lower <- 0.0
-#FLDF$eP_upper <- qrice(0.85, sigmaSQ, FLDF$P)
-#FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
-#FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P)^2
-#---- Output to text data
-UniqueDate <- unique(FLDF$Date)
-for(scanDate in UniqueDate){
-    DF <- FLDF[FLDF$Date == scanDate,]
-    sourceList <- unique(DF$Src)
-    freqList   <- unique(DF$Freq)
-    for(src in sourceList){
-        srcDF <- DF[DF$Src == src,]
+scanDFList <- mclapply(unique(FLDF$Date), function(scan){ return(FLDF[FLDF$Date == scan,])})
+
+
+
+tempList <- mclapply( srcDFList, function(srcDF){
+    scanDFList <- mclapply( unique(srcDF$Date), function(scan){ return(srcDF[srcDF$Date == scan,])})
+    return(mclapply(scanDfList, predStokes ))
+})
     
 
+
+
+tempList <- mclapply( scanDfList, predStokes )
+    
+
+return(srcD)
+
+
+
+srcDfList <- list()
+
+
+
+for(source in sourceList){ srcDfList <- c(srcDfList, list(FLDF[FLDF$Src == source,]))}
+
+
+
+srcDF <- srcDfList[[1]]
+UniqueDate <- unique(srcDF$Date)
+scanDfList <- list()
+for(scan in UniqueDate){
+    scanDfList <- c(scanDfList, list(srcDF[srcDF$Date == scan,]))
+}
+tempList <- mclapply( scanDfList, predStokes )
+
+
+        
+
+
+
+FLDF$P <- sqrt(FLDF$Q^2 + FLDF$U^2)
+sigmaSQ <- sqrt(FLDF$eQ * FLDF$eU + (FLDF$I* sysPerr)^2)
+FLDF$eP_lower <- qrice(0.15, sigmaSQ, FLDF$P)
+FLDF[FLDF$P < sigmaSQ,]$eP_lower <- 0.0
+FLDF$eP_upper <- qrice(0.85, sigmaSQ, FLDF$P)
+FLDF$EVPA <- 0.5* atan2(FLDF$U, FLDF$Q)
+FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P)^2
+#---- Output to text data
 
 
 TextDF <- FLDF[order(FLDF$Date),]
