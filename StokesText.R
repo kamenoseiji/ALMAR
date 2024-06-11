@@ -1,17 +1,22 @@
 library(parallel)   # multicore parallelization
+library(doParallel) # multicore parallelization
 library(VGAM)       # for Rice distribution
 Sys.setenv(TZ="UTC")
-sysIerr <- 0.005       # temporal Stokes I systematic error
-sysPerr <- 0.003       # temporal polarization systematic error
+#sysIerr <- 0.005       # temporal Stokes I systematic error
+#sysPerr <- 0.003       # temporal polarization systematic error
 minAntNum <- 5		   # Minimum number of antennas
-numSubBand = c(3,3,3,1,1,1,1,1,1,1) # Number of sub-bands for Band[1-10]
+#numSubBand = c(3,3,3,1,1,1,1,1,1,1) # Number of sub-bands for Band[1-10]
 standardFreq <- list(40.0, 80.0, c(91.5,97.5,103.5), 154.9, 183.0, 233.0, 343.4, 410.2)
-#-------- Band
+#-------- Functions
+#-------- Get band name
 getBand <- function(fileName){
-    bandPointer <- as.integer(regexpr("RB_[0-10]", fileName)[1])
+    bandPointer <- regexpr("RB_[0-10]", fileName)
     return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
 }
-load('Flux.Rdata')
+srcDfFilter  <- function(source){ return(FLDF[FLDF$Src == source,])}
+scanDfFilter <- function(scan){ return(FLDF[FLDF$Date == scan,])}
+
+#-------- Input multiple frequency data and output Stokes parameters at the standard frequency
 predStokes <- function(df){
     bandID   <- getBand(df$File[1])
     fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/eI^2)
@@ -25,12 +30,54 @@ predStokes <- function(df){
     pred <- as.numeric(predict(fitV, newDF, interval='confidence', level=0.67)); newDF$V <- matrix(pred, ncol=3)[,1]; newDF$eV <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
     return(newDF)
 }
+load('Flux.Rdata')
+FLDF$Band <- getBand(FLDF$File)
+recNum <- nrow(FLDF)
+index <- order(FLDF$Date, FLDF$Src, FLDF$Band, FLDF$Freq)
+diffRange1 <- 1:(recNum-1)
+diffRange2 <- 2:recNum
+recBorder <- which( (FLDF[index,]$Src[diffRange1] != FLDF[index,]$Src[diffRange2]) | diff(FLDF[index,]$Date) > 0 | diff(FLDF[index,]$Band) > 0 )
 
-srcDfList <- mclapply(unique(FLDF$Src), function(source){ return(FLDF[FLDF$Src == source,]) })
+
+
+
+recBorder <- which((FLDF[index, ]$Src[1:(length(index)-1)] != FLDF[index, ]$Src[2:length(index)]) || (FLDF[index, ]$Date[1:(length(index)-1)] != FLDF[index, ]$Date[2:length(index)]))
+
+
+
+
+
+
+
+
+
+
+#srcDfList <- mclapply(unique(FLDF$Src), function(source){ return(FLDF[FLDF$Src == source,]) })
+srcDfList <- mclapply(unique(FLDF$Src), srcDfFilter)
+#scanDFList <- mclapply(unique(FLDF$Date), scanDfFilter)
+
+cores <- detectCores()
+cl <- makcCluster(cores)
+registerDoParallel(cl)
+
+srcNum <- length(srcDfList)
+result <- foreach(src_index = 1:srcNum) %dopar% {
+    cat(sprintf('%d : %s %d\n', src_index, srcDfList[[src_index]]$Src[1], length(unique(srcDfList[[src_index]]$Date))))
+    scanDfList <- mclapply(unique(srcDfList[[src_index]]$Date), scanDfFilter)
+}
+
+for(src_index in 1:srcNum){
+    srcDF <- srcDfList[[src_index]]
+    cat(sprintf('%d : %s %d\n', src_index, srcDF$Src[1], length(unique(srcDF$Date))))
+    scanDfList <- mclapply(unique(srcDF$Date), scanDfFilter)
+}
+    #tempList <- mclapply( scanDfList, predStokes )
+    
+
 for(srcDF in srcDfList){
     cat(srcDF$Src[1])
     scanList <- unique(srcDF$Date)
-    scanDFList <- mclapply(scanList, function(scan){ return(srcDF[srcDF$Date == scan,]) })
+    scanDfList <- mclapply(scanList, function(scan){ return(srcDF[srcDF$Date == scan,]) })
     tempList <- mclapply( scanDfList, predStokes )
 }
 
