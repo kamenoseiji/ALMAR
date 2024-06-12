@@ -1,24 +1,25 @@
 library(parallel)   # multicore parallelization
-library(doParallel) # multicore parallelization
+#library(doParallel) # multicore parallelization
 library(VGAM)       # for Rice distribution
 Sys.setenv(TZ="UTC")
 #sysIerr <- 0.005       # temporal Stokes I systematic error
-#sysPerr <- 0.003       # temporal polarization systematic error
+sysPerr <- 0.003       # temporal polarization systematic error
 minAntNum <- 5		   # Minimum number of antennas
 #numSubBand = c(3,3,3,1,1,1,1,1,1,1) # Number of sub-bands for Band[1-10]
 standardFreq <- list(40.0, 80.0, c(91.5,97.5,103.5), 154.9, 183.0, 233.0, 343.4, 410.2)
+numCore = detectCores()
 #-------- Functions
+srcDfFilter  <- function(source){ return(FLDF[FLDF$Src == source,])}
+scanDfFilter <- function(scan){ return(FLDF[FLDF$Date == scan,])}
 #-------- Get band name
 getBand <- function(fileName){
     bandPointer <- regexpr("RB_[0-10]", fileName)
     return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
 }
-srcDfFilter  <- function(source){ return(FLDF[FLDF$Src == source,])}
-scanDfFilter <- function(scan){ return(FLDF[FLDF$Date == scan,])}
-
 #-------- Input multiple frequency data and output Stokes parameters at the standard frequency
 predStokes <- function(df){
-    bandID   <- getBand(df$File[1])
+    #bandID   <- getBand(df$File[1])
+    bandID   <- df$Band[1]
     fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/eI^2)
     fitQ <- lm(formula=Q ~ Freq, data=df, weight=1.0/eQ^2)
     fitU <- lm(formula=U ~ Freq, data=df, weight=1.0/eU^2)
@@ -28,15 +29,46 @@ predStokes <- function(df){
     pred <- as.numeric(predict(fitQ, newDF, interval='confidence', level=0.67)); newDF$Q <- matrix(pred, ncol=3)[,1]; newDF$eQ <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
     pred <- as.numeric(predict(fitU, newDF, interval='confidence', level=0.67)); newDF$U <- matrix(pred, ncol=3)[,1]; newDF$eU <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
     pred <- as.numeric(predict(fitV, newDF, interval='confidence', level=0.67)); newDF$V <- matrix(pred, ncol=3)[,1]; newDF$eV <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+    newDF$Date <- df$Date[1]
+    newDF$File <- df$File[1]
+    #newDF$P <- sqrt(df$Q^2 + df$U^2)
+    #sigmaSQ <- sqrt(df$eQ * df$eU + (df$I* sysPerr)^2)
+    #newDF$eP_lower <- qrice(0.15, sigmaSQ, FLDF$P)
+    #newDF[newDF$P < sigmaSQ,]$eP_lower <- 0.0
+    #newDF$eP_upper <- qrice(0.85, sigmaSQ, newDF$P)
+    #newDF$EVPA <- 0.5* atan2(df$U, df$Q)
+    #newDF$eEVPA <- 0.5* sqrt(newDF$Q^2 * newDF$eU^2 + newDF$U^2 * newDF$eQ^2) / (newDF$P)^2
     return(newDF)
 }
+#-------- Text Formatting
+textResult <- function(entry){
+    text_sd <- sprintf()
+    return(text_sd)
+}
+
 load('Flux.Rdata')
 FLDF$Band <- getBand(FLDF$File)
 recNum <- nrow(FLDF)
-index <- order(FLDF$Date, FLDF$Src, FLDF$Band, FLDF$Freq)
+FLDF <- FLDF[order(FLDF$Date, FLDF$Src, FLDF$Band, FLDF$Freq),]
+sliceDF <- function(slice){ return(FLDF[slice[1]:slice[2],])}
 diffRange1 <- 1:(recNum-1)
 diffRange2 <- 2:recNum
-recBorder <- which( (FLDF[index,]$Src[diffRange1] != FLDF[index,]$Src[diffRange2]) | diff(FLDF[index,]$Date) > 0 | diff(FLDF[index,]$Band) > 0 )
+recBorder <- c(1, which( (FLDF$Src[diffRange1] != FLDF$Src[diffRange2]) | diff(FLDF$Date) > 0 | diff(FLDF$Band) > 0 )+1)
+recLength <- diff(c(recBorder, recNum+1) )
+recMat <- matrix(c(recBorder,   c(tail(recBorder, n=length(recBorder)-1)-1, recNum) ), ncol=2) 
+tempDF <- apply(recMat, 1, sliceDF)
+result <- mclapply(tempDF, predStokes, mc.cores=numCore)
+textDF <- do.call("rbind", result)
+
+
+
+
+
+FLDF[
+
+
+recLength <- diff(c(recBorder, recNum+1) )
+
 
 
 

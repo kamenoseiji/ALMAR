@@ -4,6 +4,7 @@ Sys.setenv(TZ="UTC")
 sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
 minAntNum <- 5		   # Minimum number of antennas
+numCore = detectCores()
 sourceMatch <- function(sourceName){
 	sourceDict <- list(
 		c('J0006-0623', 'J0006-063'),
@@ -89,7 +90,7 @@ getBand <- function(fileList){
     return(as.integer(mclapply(fileList, function(fileName){
             bandPointer <- as.integer(regexpr("RB_[0-10]", fileName)[1])
             return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
-        })))
+        },mc.cores=numCore)))
 }
 #-------- Count record number
 countRec <- function(fileName){
@@ -111,16 +112,16 @@ for(index in 1:length(fileList)){
 fileList <- fileList[fileList != 'FlaggedByAntNum']
 #-------- Count number of records
 bandID <- getBand(fileList)
-recordNum <- sum(as.integer(mclapply(fileList, countRec)))
+recordNum <- sum(as.integer(mclapply(fileList, countRec, mc.cores=numCore)))
 #-------- Generage FLDF
-DFList <- mclapply(fileList, readStokesSection)
+DFList <- mclapply(fileList, readStokesSection, mc.cores=numCore)
 FLDF <- DFList[[1]]
 for(file_index in 2:length(DFList)){ FLDF <- rbind(FLDF, DFList[[file_index]]) }
 #-------- Filter FLDF
 FLDF <- na.omit(FLDF)
 FLDF <- FLDF[FLDF$I > 2.0* FLDF$eI, ]                       # too large error
 FLDF <- FLDF[FLDF$I^2  > FLDF$Q^2 + FLDF$U^2 +  FLDF$V^2,]  # polarization degree
-FLDF$Src <- as.character(mclapply(as.character(FLDF$Src), sourceMatch))
+FLDF$Src <- as.character(mclapply(as.character(FLDF$Src), sourceMatch,mc.cores=numCore))
 FLDF$eI <- sqrt(FLDF$eI^2 + (sysIerr*FLDF$I)^2)
 FLDF$eQ <- sqrt(FLDF$eQ^2 + (sysPerr*FLDF$Q)^2)
 FLDF$eU <- sqrt(FLDF$eU^2 + (sysPerr*FLDF$U)^2)
