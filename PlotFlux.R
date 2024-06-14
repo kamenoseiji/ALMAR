@@ -141,6 +141,7 @@ if(argList$Table){
 	}
 }
 #-------- Time-series plots
+if(0){
 bandColor <- brewer.pal(numFreq, "Dark2")
 for(src_index in 1:numSrc){
     rm(DF)
@@ -181,6 +182,7 @@ system('rm -rf J*.flux_files')
 for(src_index in 1:numSrc){
 	text_sd <- sprintf('ln -s common.flux_files %s.flux_files', sourceList[src_index])
 	system(text_sd)
+}
 }
 #-------- Source 60-day statistics
 I100 <- Q100 <- U100 <- numeric(numSrc)

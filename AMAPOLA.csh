@@ -22,6 +22,7 @@ cp Flux.Rdata AMAPOLA
 cp AeDF.Rdata AMAPOLA
 cp Dterm.Rdata AMAPOLA
 cp amapola.txt AMAPOLA
+/usr/local/bin/Rscript ../StokesText.R
 /usr/local/bin/Rscript ../PlotFlux.R
 mv PolQuery.CSV AMAPOLA
 mv *.pdf AMAPOLA/PDF

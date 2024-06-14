@@ -1,5 +1,6 @@
 library(RColorBrewer)
 library(plotly, warn.conflicts=FALSE)
+library(htmlwidgets)   # multicore parallelization
 library(parallel)   # multicore parallelization
 #library(doParallel) # multicore parallelization
 library(VGAM)       # for Rice distribution
@@ -48,6 +49,7 @@ getBand <- function(fileList){
 }
 #-------- Starging Process
 load('Flux.Rdata')
+FLDF$Band <- getBand(FLDF$File)
 recNum <- nrow(FLDF)
 FLDF <- FLDF[order(FLDF$Date, FLDF$Src, FLDF$Band, FLDF$Freq),]
 sliceDF <- function(slice){ return(FLDF[slice[1]:slice[2],])}
@@ -83,8 +85,6 @@ par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
 labels <- c("B1",        "B3",        "B4",        "B6",        "B7",        "> B7")
 colors <- c("#FF80003F", "#E020003F", "#8080003F", "#00C0803F", "#0000FF3F", "#0000003F")
-#threshU <-c(41.0,        98.0,        200.0,       280.0,       380.0,       700.0)
-#threshL <-c(39.0,        97.0,        120.0,       200.0,       280.0,       380.0)
 plotXrange <- range(FLDF$Date)
 bandList <- unique(textDF$Band)
 bandIndex <- c(1,0,2,3,0,4,5,6,0)
@@ -118,56 +118,41 @@ for(sourceName in sourceList){
     axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
 	mtext(side = 3, line=1, outer=T, text = sourceName, cex=2)
 
-    plot_I <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~I, type="scatter", mode="markers", color=paste("I", freqLabel[1]), colors=bandColor, error_y = list(array=~eI, thickness=1, width=0))
-    plot_P <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~P, type="scatter", mode="markers", color=paste("P",freqLabel[1]), colors=bandColor, error_y = list(symmetric=FALSE, array=~errU, arrayminus=~errL, thickness=1, width=0))
-    plot_A <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", color=paste("EVPA",freqLabel[1]), colors=bandColor, error_y = list(array=~eEVPA*180/pi, thickness=1, width=0))
-    allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=T, titleY=T)
-    htmlFile <- sprintf("%s.flux.html", sourceList[src_index])
-    htmlwidgets::saveWidget(allPlot, htmlFile, selfcontained=FALSE )
-    rm(plot_I); rm(plot_P); rm(plot_A); rm(allPlot); rm(htmlFile)
 }
 par(par.old)
 dev.off()
+#-------- Time-series HTML
+numFreq <- length(bandList)
+bandColor <- brewer.pal(numFreq, "Dark2")
+for(sourceName in sourceList){
+	DF <- textDF[textDF$Src == sourceName,]
+    plot_I <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~I, type="scatter", mode="markers", color=paste("I", labels[1]), colors=bandColor, error_y = list(array=~eI, thickness=1, width=0))
+    for(freq_index in 2:numFreq){
+        if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[freq_index],], color=paste("I", labels[freq_index]))}
+    }
+    plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero', hoverformat='.3f'), title=sourceName)
+
+    plot_P <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~P, type="scatter", mode="markers", color=paste("P",labels[1]), colors=bandColor, error_y = list(symmetric=FALSE, array=~eP_upper, arrayminus=~eP_lower, thickness=1, width=0))
+    for(freq_index in 2:numFreq){
+        if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[freq_index],], color=paste("P",labels[freq_index]))}
+    }
+    plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero', hoverformat='.3f'))
+
+    plot_A <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", color=paste("EVPA",labels[1]), colors=bandColor, error_y = list(array=~eEVPA*180/pi, thickness=1, width=0))
+    for(freq_index in 2:numFreq){
+        if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[freq_index],], color=paste("EVPA",labels[freq_index]))}
+    }
+    plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91), hoverformat='.1f'))
+
+    allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=T, titleY=T)
+    htmlFile <- sprintf("%s.flux.html", sourceName)
+    htmlwidgets::saveWidget(allPlot, htmlFile, selfcontained=FALSE )
+    rm(plot_I); rm(plot_P); rm(plot_A); rm(allPlot); rm(htmlFile)
+}
 text_sd <- sprintf('cp -r %s.flux_files common.flux_files', sourceList[1])
 system(text_sd)
 system('rm -rf J*.flux_files')
 for(sourceName in sourceList){
     text_sd <- sprintf('ln -s common.flux_files %s.flux_files', sourceName)
     system(text_sd)
-}
-if(0){
-#-------- Time-series HTML
-bandColor <- brewer.pal(numFreq, "Dark2")
-for(sourceName in sourceList){
-	DF <- textDF[textDF$Src == sourceName,]
-    plot_I <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~I, type="scatter", mode="markers", color=paste("I", freqLabel[1]), colors=bandColor, error_y = list(array=~eI, thickness=1, width=0))
-    for(freq_index in 2:numFreq){
-        if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[freq_index],], color=paste("I", freqLabel[freq_index]))}
-    }
-    plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero', hoverformat='.3f'), title=sourceList[src_index])
-
-    plot_P <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~P, type="scatter", mode="markers", color=paste("P",freqLabel[1]), colors=bandColor, error_y = list(symmetric=FALSE, array=~errU, arrayminus=~errL, thickness=1, width=0))
-    for(freq_index in 2:numFreq){
-        if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[freq_index],], color=paste("P",freqLabel[freq_index]))}
-    }
-    plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero', hoverformat='.3f'))
-
-    plot_A <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", color=paste("EVPA",freqLabel[1]), colors=bandColor, error_y = list(array=~eEVPA*180/pi, thickness=1, width=0))
-    for(freq_index in 2:numFreq){
-        if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[freq_index],], color=paste("EVPA",freqLabel[freq_index]))}
-    }
-    plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91), hoverformat='.1f'))
-
-    allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=T, titleY=T)
-    htmlFile <- sprintf("%s.flux.html", sourceList[src_index])
-    htmlwidgets::saveWidget(allPlot, htmlFile, selfcontained=FALSE )
-    rm(plot_I); rm(plot_P); rm(plot_A); rm(allPlot); rm(htmlFile)
-}
-text_sd <- sprintf('cp -r %s.flux_files common.flux_files', sourceList[1])
-system(text_sd)
-system('rm -rf J*.flux_files')
-for(src_index in 1:numSrc){
-    text_sd <- sprintf('ln -s common.flux_files %s.flux_files', sourceList[src_index])
-    system(text_sd)
-}
 }
