@@ -55,7 +55,7 @@ parseArg <- function( args ){
 parseScan <- function(scan){return(as.numeric(strsplit(scan, '[ |(|)|z]+')[[1]][c(3,5,6,7,8,9,10,11,12)]))} # Stokes parameter entry line format
 #-------- Read Stokes Parameters
 readStokesSection <- function(fileName){
-    fileLines <- removeBlank(readLines(fileName))
+    fileLines <- removeBlank(readLines(fileName, skipNul=TRUE))
     #---- Scan Entries
     scanPointer   <- grep('EL=', fileLines)
     scanEntryList <- fileLines[scanPointer]
@@ -94,7 +94,7 @@ getBand <- function(fileList){
 }
 #-------- Count record number
 countRec <- function(fileName){
-    fileLines <- removeBlank(readLines(fileName))
+    fileLines <- removeBlank(readLines(fileName, skipNul=TRUE))
     return(length(grep('GHz', fileLines)) - length(grep('mean', fileLines)))
 }
 #-------- remove blank lines
@@ -106,7 +106,7 @@ fileList <- parseArg(Arguments)
 #-------- Filter by number of used antennas
 for(index in 1:length(fileList)){
 	fileName <- fileList[index]
-    fileLines <- removeBlank(readLines(fileName))
+    fileLines <- removeBlank(readLines(fileName, skipNul=TRUE))
 	if(getAntNum(fileLines) < minAntNum){	fileList[index] <- 'FlaggedByAntNum' }
 }
 fileList <- fileList[fileList != 'FlaggedByAntNum']
