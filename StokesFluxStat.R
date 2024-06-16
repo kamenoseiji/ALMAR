@@ -35,6 +35,7 @@ sourceMatch <- function(sourceName){
 		c('J1642+3948', '3c345'),
 		c('J1733-1304', 'J1733-130'), 
 		c('J1751+0939', 'J1751+096'), 
+		c('J1819-0258', 'J181917-025807'), 
 		c('J1924-2914', 'J1924-292'),
 		c('J2025+3343', 'J2025+337'),
 		c('J2056-4714', 'J2056-472'),
@@ -104,19 +105,17 @@ removeBlank <- function(Lines){ return( Lines[which(nchar(Lines) > 1)]) }
 Arguments <- 'fileList'
 fileList <- parseArg(Arguments)
 #-------- Filter by number of used antennas
-for(index in 1:length(fileList)){
-	fileName <- fileList[index]
+fileList <- mclapply(fileList, function(fileName){
     fileLines <- removeBlank(readLines(fileName, skipNul=TRUE))
-	if(getAntNum(fileLines) < minAntNum){	fileList[index] <- 'FlaggedByAntNum' }
-}
+    if(getAntNum(fileLines) < minAntNum){fileName <- 'FlaggedByAntNum' }
+    return(fileName)}, mc.cores=numCore)
 fileList <- fileList[fileList != 'FlaggedByAntNum']
 #-------- Count number of records
 bandID <- getBand(fileList)
 recordNum <- sum(as.integer(mclapply(fileList, countRec, mc.cores=numCore)))
 #-------- Generage FLDF
 DFList <- mclapply(fileList, readStokesSection, mc.cores=numCore)
-FLDF <- DFList[[1]]
-for(file_index in 2:length(DFList)){ FLDF <- rbind(FLDF, DFList[[file_index]]) }
+FLDF <- do.call("rbind", DFList)
 #-------- Filter FLDF
 FLDF <- na.omit(FLDF)
 FLDF <- FLDF[FLDF$I > 2.0* FLDF$eI, ]                       # too large error

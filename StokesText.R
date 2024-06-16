@@ -11,10 +11,24 @@ Today <- Sys.time()
 sysPerr <- 0.003       # temporal polarization systematic error
 minAntNum <- 5		   # Minimum number of antennas
 standardFreq <- list(40.0, 80.0, c(91.5,97.5,103.5), 154.9, 183.0, 233.0, 343.4, 410.2)
+BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
+BandFreq <- c(40.0, 80.0, 97.5, 154.9, 183.0, 233.0, 343.4, 410.2, 650.0, 800.0)
 numCore = detectCores()
 #-------- Functions
 srcDfFilter  <- function(source){ return(FLDF[FLDF$Src == source,])}
 scanDfFilter <- function(scan){ return(FLDF[FLDF$Date == scan,])}
+#-------- Hour angle to Az, El
+ha2azel <-function(ha, phi=ALMA_lat, dec=0){
+	# ha2azel : Calculate Azimuth, Elevation, and Parallactic Angle
+	# ha  : Hour Angle
+	# phi : Latitude of the site [rad]
+	# dec : Declination of the source [rad]
+	sin_el <- sin(phi)* sin(dec) + cos(phi)* cos(dec)* cos(ha)
+	el <- asin(sin_el)
+	az <- atan2(cos(dec)*sin(ha), sin(phi)*cos(dec)*cos(ha) - cos(phi)*sin(dec)) + pi
+	pa <- atan2(sin(ha), tan(phi)*cos(dec) - sin(dec)* cos(ha))
+	return(data.frame(ha=ha, az=az, el=el, pa=pa))
+}
 #-------- Get band name
 getBand <- function(fileName){
     bandPointer <- regexpr("RB_[0-10]", fileName)
@@ -180,6 +194,7 @@ for(sourceName in sourceList){
     htmlwidgets::saveWidget(allPlot, htmlFile, selfcontained=FALSE )
     rm(plot_I); rm(plot_P); rm(plot_A); rm(allPlot); rm(htmlFile)
 }
+
 text_sd <- sprintf('cp -r %s.flux_files common.flux_files', sourceList[1])
 system(text_sd)
 system('rm -rf J*.flux_files')
@@ -189,6 +204,10 @@ for(sourceName in sourceList){
 }
 #-------- Source 60-day statistics
 numSrc <- length(sourceList)
+RAList <- (60.0* as.numeric(substring(sourceList, 2,3)) + as.numeric(substring(sourceList, 4,5))) / 720 * pi # RA in [rad]
+DecList<- as.numeric(substring(sourceList, 6,8))
+DecList<- DecList + sign(DecList)* as.numeric(substring(sourceList, 9,10))/60.0
+DecList<- DecList / 180 * pi # DEC in [rad]
 I100 <- Q100 <- U100 <- numeric(numSrc)
 spixI <- spixP <- rep(NA, numSrc)
 for(src_index in 1:numSrc){
@@ -200,30 +219,31 @@ for(src_index in 1:numSrc){
     predI <- predQ <- predU <- eI <- eQ <- eU <- numObs <- freq <- numeric(numBand)
     if(numBand > 1){
         for(band_index in 1:numBand){
-            index <- which(DF$Band == bands[band_index])
-            numObs[band_index] <- length(index)
-            deltaDay <- as.numeric(difftime(DF[index,]$Date, Today))
+            fitDF <- DF[DF$Band == bands[band_index],]
+            numObs[band_index] <- nrow(fitDF)
+            deltaDay <- as.numeric(difftime(fitDF$Date, Today))
             BandTimeFit <- TRUE
             if( numObs[band_index] <= 2 ){ BandTimeFit <- FALSE }
             if( BandTimeFit ){
                 if(sd(deltaDay) < min(abs(deltaDay)) ){ BandTimeFit <- FALSE }
             }
+            fitDF <- fitDF[abs(fitDF$I - median(fitDF$I)) < 100.0* fitDF$eI,]
             if( BandTimeFit ){
-                deltaDay <- as.numeric(difftime(DF[index,]$Date, Today))
-                fit <- lm(DF$I[index] ~ deltaDay, weights=1/DF$eI[index]^2/abs(deltaDay + 1))
+                fitDF$deltaDay <- as.numeric(difftime(fitDF$Date, Today))
+                fit <- lm(I ~ deltaDay, weights=1/eI^2/abs(deltaDay + 1), data=fitDF)
                 predI[band_index] <- summary(fit)$coefficients[1,'Estimate']
                 eI[band_index] <- summary(fit)$coefficients[1,'Std. Error']
-                fit <- lm(DF$Q[index] ~ deltaDay, weights=1/DF$eQ[index]^2/abs(deltaDay + 1))
+                fit <- lm(Q ~ deltaDay, weights=1/eQ^2/abs(deltaDay + 1), data=fitDF)
                 predQ[band_index] <- summary(fit)$coefficients[1,'Estimate']
                 eQ[band_index] <- summary(fit)$coefficients[1,'Std. Error']
-                fit <- lm(DF$U[index] ~ deltaDay, weights=1/DF$eU[index]^2/abs(deltaDay + 1))
+                fit <- lm(U ~ deltaDay, weights=1/eU^2/abs(deltaDay + 1), data=fitDF)
                 predU[band_index] <- summary(fit)$coefficients[1,'Estimate']
                 eU[band_index] <- summary(fit)$coefficients[1,'Std. Error']
             } else {
-                predI[band_index] <- mean(DF$I[index]); predQ[band_index] <- mean(DF$Q[index]); predU[band_index] <- mean(DF$U[index])
-                eI[band_index] <- median(DF$eI[index]); eQ[band_index] <- median(DF$eQ[index]); eU[band_index] <- median(DF$eU[index])
+                predI[band_index] <- mean(fitDF$I); predQ[band_index] <- mean(fitDF$Q); predU[band_index] <- mean(fitDF$U)
+                eI[band_index] <- median(fitDF$eI); eQ[band_index] <- median(fitDF$eQ); eU[band_index] <- median(fitDF$eU)
             }
-            freq[band_index] <- median(DF$Freq[index])
+            freq[band_index] <- median(fitDF$Freq)
         }
         fit <- lm( log(predI) ~ log(freq/100), weights=1.0/eI^2 ); spixI[src_index] <- coef(fit)[2]; I100[src_index] <- exp(coef(fit)[1])
         fit <- lm(0.5*log(predQ^2 + predU^2) ~ log(freq/100), weights=1.0/eI^2 ); spixP[src_index] <- coef(fit)[2]
@@ -240,4 +260,12 @@ for(src_index in 1:numSrc){
 }
 srcDF <- na.omit(data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP))
 write.csv(srcDF[(abs(srcDF$DEC - ALMA_lat) > 4.0*pi/180.0),], 'PolQuery.CSV', row.names=FALSE)
-
+#-------- LST plot
+for(band in c(1,3,4,5,6,7,8,9)){
+    plotDF <- plotLST(srcDF, band)
+    pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
+    pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (30-day statistics)', band, as.character(Today)))
+    htmlFile <- sprintf("Band%d_LSTplot.html", band)
+    htmlwidgets::saveWidget(pLST, htmlFile, selfcontained=FALSE)
+    rm(plotDF)
+}
