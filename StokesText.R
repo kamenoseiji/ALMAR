@@ -200,6 +200,7 @@ for(sourceName in sourceList){
 par(par.old)
 dev.off()
 #-------- Time-series HTML
+bandList <- sort(unique(FLDF$Band))
 numFreq <- length(bandList)
 bandColor <- brewer.pal(numFreq, "Dark2")
 for(sourceName in sourceList){
