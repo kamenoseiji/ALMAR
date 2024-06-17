@@ -1,12 +1,15 @@
 library(RColorBrewer)
+library(xtable)
 library(plotly, warn.conflicts=FALSE)
+library(pandoc)
 library(htmlwidgets)   # multicore parallelization
 library(parallel)   # multicore parallelization
-#library(doParallel) # multicore parallelization
 library(VGAM)       # for Rice distribution
+FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
 Sys.setenv(TZ="UTC")
 ALMA_lat <- -23.029 * pi / 180
 Today <- Sys.time()
+recentTerm <- 60        # Statistics for recent 60 days
 #sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
 minAntNum <- 5		   # Minimum number of antennas
@@ -36,7 +39,6 @@ getBand <- function(fileName){
 }
 #-------- Input multiple frequency data and output Stokes parameters at the standard frequency
 predStokes <- function(df){
-    #bandID   <- getBand(df$File[1])
     bandID   <- df$Band[1]
     fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/eI^2)
     fitQ <- lm(formula=Q ~ Freq, data=df, weight=1.0/eQ^2)
@@ -121,9 +123,37 @@ textDF <- textDF[((textDF$Freq != standardFreq[[3]][1]) & (textDF$Freq != standa
 textDF$Band <- getBand(textDF$File)
 #-------- Plot time-seried flux densities
 textDF$Src <- trimws(textDF$Src)
-sourceList <- unique(textDF$Src)
-sourceList <- sourceList[grep('^J[0-9]',sourceList)]
-sourceList <- sourceList[order(sourceList)]
+#-------- HTML table of source flux
+recentDF <- textDF[Today - textDF$Date < recentTerm,]   # Recent 60 days
+bandList <- unique(recentDF$Band)
+for(band in bandList){
+    bandDF <- recentDF[recentDF$Band == band,]
+    lastObsIndex <- order(bandDF$Date, decreasing=TRUE)[1]
+    sourceList <- unique(bandDF$Src)
+    sourceList <- sourceList[grep('^J[0-9]',sourceList)]
+    srcDF <- mclapply(sourceList, function(source){
+        DF <- bandDF[bandDF$Src == source, ]
+        return(data.frame(Src=source, numObs = nrow(DF), I = median(DF$I), eI = sd(DF$I), Q = median(DF$Q), eQ = sd(DF$Q), U = median(DF$U), eU=sd(DF$U)))
+    }, mc.cores=numCore)
+    srcDF <- na.omit(do.call("rbind", srcDF))
+    srcDF$P  <- sqrt(srcDF$Q^2 + srcDF$U^2)
+    srcDF$eP <- sqrt(srcDF$eQ^2 + srcDF$eU^2)
+    srcDF$p  <- srcDF$P/srcDF$I
+    srcDF$EVPA  <- 90*atan2(srcDF$U, srcDF$Q)/pi
+    srcDF$eEVPA <- 90*sqrt(srcDF$Q^2 * srcDF$eU^2 + srcDF$U^2 * srcDF$eQ^2) / (srcDF$P)^2 / pi
+    srcDF <- srcDF[order(srcDF$P, decreasing=TRUE),]
+    names(srcDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)', 'sd(EVPA)')
+    srcDF$Source <- paste('<a href="', srcDF$Source, '.flux.html" target="_new" >', srcDF$Source, ' </a>', sep='')
+    #-------- HTML pol-table
+    CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : %d-day median as of %s / ', BandFreq[band], recentTerm, as.character(Today)),sep='')
+
+    CaptionText <- paste(CaptionText, '<a href="', FluxDataURL, bandDF$File[lastObsIndex], '" target="_new">', 'Last Observation on ', as.character(bandDF$Date[lastObsIndex], tz='UTC'), "</p>", sep='')
+    htmlFile <- sprintf('Stokes%.0fGHz.html', BandFreq[band])
+    html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
+    html.table <- paste(print(xtable(srcDF, digits=c(0,0,0,3,3,3,3,3,3,3,3,1,1,1)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
+    html.body <- paste("<body>", CaptionText, html.table, "</body>")
+    write(paste(html.head, html.body, sep='\n'), htmlFile)
+}
 pdf('AMAPOLA.pdf', width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
@@ -133,6 +163,9 @@ colors <- c("#FF80003F", "#E020003F", "#8080003F", "#00C0803F", "#0000FF3F", "#0
 plotXrange <- range(FLDF$Date)
 bandList <- unique(textDF$Band)
 bandIndex <- c(1,0,2,3,0,4,5,6,0)
+sourceList <- unique(textDF$Src)
+sourceList <- sourceList[grep('^J[0-9]',sourceList)]
+sourceList <- sourceList[order(sourceList)]
 for(sourceName in sourceList){
 	DF <- textDF[textDF$Src == sourceName,]
     #-------- Coloring by frequency
