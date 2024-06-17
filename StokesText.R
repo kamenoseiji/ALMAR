@@ -125,7 +125,7 @@ textDF$Band <- getBand(textDF$File)
 textDF$Src <- trimws(textDF$Src)
 #-------- HTML table of source flux
 recentDF <- textDF[Today - textDF$Date < 24*recentTerm,]   # Recent 60 days
-bandList <- unique(recentDF$Band)
+bandList <- sort(unique(recentDF$Band))
 for(band in bandList){
     bandDF <- recentDF[recentDF$Band == band,]
     lastObsIndex <- order(bandDF$Date, decreasing=TRUE)[1]
@@ -210,7 +210,7 @@ for(sourceName in sourceList){
     }
     plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=c(min(DF$Date)-86400, max(DF$Date)+86400)), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero', hoverformat='.3f'), title=sourceName)
 
-    plot_P <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~P, type="scatter", mode="markers", color=paste("P",freqLabels[1]), colors=bandColor, error_y = list(symmetric=FALSE, array=~eP_upper, arrayminus=~eP_lower, thickness=1, width=0))
+    plot_P <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~P, type="scatter", mode="markers", color=paste("P",freqLabels[1]), colors=bandColor, error_y = list(symmetric=FALSE, array=~(eP_upper - P), arrayminus=~(P-eP_lower), thickness=1, width=0))
     for(freq_index in 2:numFreq){
         if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[freq_index],], color=paste("P",freqLabels[freq_index]))}
     }
