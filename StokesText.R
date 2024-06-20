@@ -138,7 +138,7 @@ for(band in bandList){
     srcDF <- na.omit(do.call("rbind", srcDF))
     srcDF$P  <- sqrt(srcDF$Q^2 + srcDF$U^2)
     srcDF$eP <- sqrt(srcDF$eQ^2 + srcDF$eU^2)
-    srcDF$p  <- srcDF$P/srcDF$I
+    srcDF$p  <- 100*srcDF$P/srcDF$I
     srcDF$EVPA  <- 90*atan2(srcDF$U, srcDF$Q)/pi
     srcDF$eEVPA <- 90*sqrt(srcDF$Q^2 * srcDF$eU^2 + srcDF$U^2 * srcDF$eQ^2) / (srcDF$P)^2 / pi
     srcDF <- srcDF[order(srcDF$P, decreasing=TRUE),]
