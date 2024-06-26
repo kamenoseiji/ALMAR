@@ -1,17 +1,17 @@
 #mkdir WORK
 rsync -auvz skameno@ssh.alma.cl:/home/skameno/public_html/Grid/Stokes/ WORK/
 cd WORK
-rm *.Rdata
-rm *.pdf
-rm *.table
-rm *.CSV
-rm *.html
-rm -rf *_files
-rm -rf AMAPOLA
-ls -la *Flux.log | awk '{if ($5 >= 1024) print $9}' > fileList
-/usr/local/bin/Rscript ../StokesFluxStat.R fileList
-/usr/local/bin/Rscript ../ReadAeff.R fileList
-/usr/local/bin/Rscript ../StokesText.R
+\rm *.Rdata
+\rm *.pdf
+\rm *.table
+\rm *.CSV
+\rm *.html
+\rm -rf *_files
+\rm -rf AMAPOLA
+\ls -la *Flux.log | awk '{if ($5 >= 1024) print $9}' > fileList
+/bin/Rscript ../StokesFluxStat.R fileList
+/bin/Rscript ../ReadAeff.R fileList
+/bin/Rscript ../StokesText.R
 mkdir AMAPOLA
 mkdir AMAPOLA/PDF
 mkdir AMAPOLA/Table
@@ -23,7 +23,6 @@ cp Flux.Rdata AMAPOLA
 cp AeDF.Rdata AMAPOLA
 cp Dterm.Rdata AMAPOLA
 cp amapola.txt AMAPOLA
-#/usr/local/bin/Rscript ../PlotFlux.R
 mv PolQuery.CSV AMAPOLA
 mv *.pdf AMAPOLA/PDF
 mv *.table AMAPOLA/Table

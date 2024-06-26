@@ -136,6 +136,7 @@ for(band in bandList){
         return(data.frame(Src=source, numObs = nrow(DF), I = median(DF$I), eI = sd(DF$I), Q = median(DF$Q), eQ = sd(DF$Q), U = median(DF$U), eU=sd(DF$U)))
     }, mc.cores=numCore)
     srcDF <- na.omit(do.call("rbind", srcDF))
+    if(nrow(srcDF) == 0){next}
     srcDF$P  <- sqrt(srcDF$Q^2 + srcDF$U^2)
     srcDF$eP <- sqrt(srcDF$eQ^2 + srcDF$eU^2)
     srcDF$p  <- 100*srcDF$P/srcDF$I

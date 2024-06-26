@@ -1,5 +1,7 @@
+library(parallel)   # multicore parallelization
 library(suncalc)
 library(scales)
+numCore = detectCores()
 Sys.setenv(TZ="UTC")
 ALMA_POS <- matrix(c( -67.755, -23.029 ), nrow=1 )
 SSOlist = c('Uranus', 'Neptune', 'Callisto', 'Ganymede', 'Titan', 'Io', 'Europa', 'Ceres', 'Pallas', 'Vesta', 'Juno', 'Mars', 'Mercury', 'Venus')
@@ -8,27 +10,30 @@ parseArg <- function( args ){
     fileDF <- read.table(args[1])
     return( as.character(fileDF[[1]]) )
 }
+#-------- Receiver Band
+getBand <- function(fileList){
+    return(as.integer(mclapply(fileList, function(fileName){
+            bandPointer <- as.integer(regexpr("RB_[0-10]", fileName)[1])
+            return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
+        },mc.cores=numCore)))
+}
 #-------- Find Calibrator name
 findCalibrator <- function( Lines ){
-	if( length(grep(" Aeff", Lines)) == 0){ return(list(0))}
-    for(SSO in SSOlist){
+    SSOListPointer <- grep("Flux Calibrator is", Lines)
+	if( length(SSOListPointer) == 0){ SSOListPointer <- grep(" Aeff", Lines) }
+	if( length(SSOListPointer) == 0){ return(list(0))}
+    UsedSSOList <- SSOlist[SSOlist %in% strsplit(Lines[SSOListPointer], '[ |,]')[[1]]]
+    if(exists('scalerUTC')){ rm(scalerUTC) }
+    for(SSO in UsedSSOList){
+        if(exists('scalerUTC')){ break }
         SSOpointer <- grep(paste(SSO, 'EL'), Lines)
-        #for( SSOpointer in SSOpointers ){
-        #    if(length(grep('Model I', Lines[SSOpointer+1])) == 0){ next }
-        #}
-        #if(length(grep('Model I', Lines[SSOpointer+1])) == 0){ next }
         if(length(SSOpointer) == 0){ next}
-        datePointer <- SSOpointer + 3
-        StokesI <- errI <- numeric(0)
-        while(length(grep('SPW', Lines[datePointer]) ) > 0){
-        	lineData <- strsplit(Lines[datePointer], '[ |(|)|z]+')[[1]]
-            if(length(lineData) < 13){ datePointer <- datePointer + 1; next }
-            StokesI <- append(StokesI, as.numeric(lineData[5]))
-            errI    <- append(errI,    as.numeric(lineData[6]))
-            datePointer <- datePointer + 1
-        }
-        if(length(StokesI) < 3){ next }
-        if(median(StokesI) / median(errI) < 5.0){ next }
+        datePointer <- SSOpointer
+        while(length(grep('mean', Lines[datePointer]) ) == 0){ datePointer <- datePointer + 1}
+        lineData <- strsplit(Lines[datePointer], '[ |(|)|z]+')[[1]]
+        StokesI <- as.numeric(lineData[5])
+        errI    <- as.numeric(lineData[6])
+        if(StokesI / errI < 5.0){ next }
         fluxCalName <- strsplit(Lines[SSOpointer], '[ |=]+')[[1]][3]
         EL <- as.numeric(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][5])
 	    scalerUTC <- strptime(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
@@ -47,7 +52,7 @@ readAeffSection <- function(Lines){
     XspwList <- grep("-X", spwLabel) + 2; YspwList <- grep("-Y", spwLabel) + 2
     FMT <- c('Ant', 'AeX', 'AeY')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
-	while( is.na(strsplit(Lines[pointer], ' ')[[1]][1]) == F){
+	while(length(grep('%', Lines[pointer])) > 0){
         tmpDF <- data.frame(
             Ant = strsplit(Lines[pointer], ' ')[[1]][1],
             AeX = median(as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][XspwList])),
@@ -83,30 +88,33 @@ readAeApriori <- function(Lines){
 }
 #-------- Read D-term Section
 readDtermSection <- function(Lines){
+    FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4', 'Date')
     #---- Date
 	pointer <- grep("EL=", Lines)[1]
     BP_UTC <- strptime(strsplit(Lines[pointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
+    emptyDF <- data.frame(Ant=NA, Dx1=0.0+0.0i, Dy1=0.0+0.0i, Dx2=0.0+0.0i, Dy2=0.0+0.0i, Dx3=0.0+0.0i, Dy3=0.0+0.0i, Dx4=0.0+0.0i, Dy4=0.0+0.0i, Date=BP_UTC)
     #---- D-term
 	pointer <- grep("D-term", Lines)
-    if(length(pointer) == 0){ return(-1)}
+    if(length(pointer) == 0){ return(emptyDF)}
     spwLabel <- strsplit(Lines[pointer], '[ |:]+')[[1]]
-    if( length(spwLabel) < 5){ return(-1) }
+    if( length(spwLabel) < 5){ return(emptyDF) }
     spwLabel <- strsplit(Lines[pointer + 1], '[ |:]+')[[1]]
     spwList <- grep('[Dx|Dy]', spwLabel)
     pointer <- pointer + 2
-    FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4', 'Date')
-    DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
     while( is.na(strsplit(Lines[pointer], ' ')[[1]][1]) == F){
-        Dline <- gsub('i', 'i ', Lines[pointer])
-        Dvec  <- as.complex(strsplit(Dline, ' +')[[1]][spwList])
-        tmpDF <- data.frame(Ant = strsplit(Dline, ' +')[[1]][1])
-        tmpDF[1,2:9] <- Dvec
-        tmpDF$Date <- BP_UTC
-        DF <- rbind(DF, tmpDF)
+        Dvec  <- as.complex(strsplit(Lines[pointer], ' +')[[1]][spwList])
+        tempDF <- data.frame(Ant = strsplit(Lines[pointer], ' +')[[1]][1])
+        tempDF[1,2:9] <- Dvec
+        tempDF$Date <- BP_UTC
+        colnames(tempDF) <- FMT
+        if(is.na(emptyDF[[1]])[1]){
+            emptyDF <- tempDF
+        } else {
+            emptyDF <- rbind(emptyDF, tempDF)
+        }
         pointer <- pointer + 1
     }
-    names(DF) <- FMT
-	return(DF)
+	return(emptyDF)
 }    
 #-------- Ae correction
 AeCorrect <- function(DF, band=3, thresh=10){
@@ -164,56 +172,66 @@ SPL_period <- function(DF, refPeriod, weight=c(0,0)){
     }
     return( data.frame(Date=refPeriod, Value=predict(SPL, refPeriod)$y ))
 }
+#-------- Read Aeff section and store into a data frame
+Log2Aeff <- function(fileName){
+    FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset')
+    fileLines <- readLines(fileName)
+    emptyDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]
+    colnames(emptyDF) <- FMT
+    if(length(fileLines) < 10){ return(emptyDF) }
+    if(fileLines[1] == ''){ return(emptyDF) }
+	CalList <- findCalibrator(fileLines)
+    if(CalList[[1]] == 0){ return(emptyDF) }
+    if(CalList[[1]] > 0){
+	    emptyDF  <- readAeffSection(fileLines)
+        emptyDF$Band <- getBand(fileName)
+	    emptyDF$calibrator <- CalList$calibrator
+	    emptyDF$EL <- CalList$EL
+	    emptyDF$Date <- CalList$UTC
+	    emptyDF$sunset <- CalList$sunset
+    } else {
+        emptyDF <- readAeApriori(fileLines)
+        emptyDF$Band <- getBand(fileName)
+    }
+    return(emptyDF)
+}
+#-------- Read D-term section and store into a data frame
+Log2Dterm <- function(fileName){
+    FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4', 'Date', 'File')
+    fileLines <- readLines(fileName)
+    emptyDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]
+    colnames(emptyDF) <- FMT
+    if(length(fileLines) < 10){ return() }
+    if(fileLines[1] == ''){ return() }
+    emptyDF <- readDtermSection(fileLines)
+    emptyDF$File <- fileName
+    return(emptyDF)
+}
 #-------- Start program
 #Arguments <- commandArgs(trailingOnly = T)
 #fileList <- parseArg(Arguments)
 fileList <- parseArg('fileList')
-FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset')
-AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
-FMT <- c('Ant', 'Dx1', 'Dy1', 'Dx2', 'Dy2', 'Dx3', 'Dy3', 'Dx4', 'Dy4', 'Date')
-DtermDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DtermDF) <- FMT
-for(fileName in fileList){
-	#cat(fileName); cat('\n')
-    fileLines <- readLines(fileName)
-    if(length(fileLines) < 10){ next }
-    if(fileLines[1] == ''){ next }
-	CalList <- findCalibrator(fileLines)
-    if(CalList[[1]] == -1){ next }
-    if(CalList[[1]] > 0){
-	    DF  <- readAeffSection(fileLines)
-	    DF$calibrator <- CalList$calibrator
-	    DF$EL <- CalList$EL
-	    DF$Date <- CalList$UTC
-	    DF$sunset <- CalList$sunset
-    } else {
-        DF <- readAeApriori(fileLines)
-    }
-    if( nrow(DF) < 1 ){ next }
-    DF$File <- fileName
-	DF$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
-	AeDF <- rbind(AeDF, DF)
-	Ddf <- readDtermSection(fileLines)
-    if( length(attributes(Ddf)) != 0){
-	    Ddf$Band <- as.numeric(strsplit(fileName, '_+|-')[[1]][6])
-	    #Ddf$calibrator <- DF$calibrator
-	    #Ddf$EL <- DF$EL
-	    #Ddf$Date <- DF$Date
-	    #Ddf$sunset <- DF$sunset
-	    Ddf$File <- fileName
-	    DtermDF <- rbind(DtermDF, Ddf)
-    }
-}
+#AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
+DFList <- mclapply(fileList, Log2Aeff, mc.cores=numCore)
+AeDF <- do.call("rbind", DFList)
 AeDF <- AeDF[complete.cases(AeDF$AeX),]
 AeDF <- AeDF[complete.cases(AeDF$AeY),]
 AeDF <- AeDF[((AeDF$AeX > 25.0) & (AeDF$AeX < 100.0) & (AeDF$AeY > 25.0) & (AeDF$AeY < 100.0)),]
 AeDF <- AeDF[complete.cases(AeDF$Date),]
+AeDF <- na.omit(AeDF)
 AeDF <- AeDF[order(AeDF$Date), ]
-DtermDF <- DtermDF[complete.cases(DtermDF$Date),]
-DtermDF <- DtermDF[order(DtermDF$Date), ]
 save(AeDF, file='AeDF.Rdata')
+
+DFList <- mclapply(fileList, Log2Dterm, mc.cores=numCore)
+DtermDF <- do.call("rbind", DFList)
+DtermDF <- DtermDF[complete.cases(DtermDF$Date),]
+DtermDF <- na.omit(DtermDF)
+DtermDF <- DtermDF[order(DtermDF$Date), ]
+DtermDF$Band <- getBand(DtermDF$File)
 save(DtermDF, file='Dterm.Rdata')
+
 #-------- Ae table
-BandList <- c(3, 6, 7)
+BandList <- c(1, 3, 4, 6, 7)
 pcolors <- c(alpha('orange', 0.5), alpha('purple', 0.5))
 lcolors <- c('orange', 'purple')
 refTime <- max(AeDF$Date)
