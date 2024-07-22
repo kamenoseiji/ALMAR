@@ -95,6 +95,7 @@ plotLST <- function(DF, band){
 }
 #-------- Starging Process
 load('Flux.Rdata')
+FLDF <- FLDF[FLDF$eI > 1e-5,]
 FLDF$Band <- getBand(FLDF$File)
 recNum <- nrow(FLDF)
 FLDF <- FLDF[order(FLDF$Date, FLDF$Src, FLDF$Band, FLDF$Freq),]
@@ -247,24 +248,21 @@ I100 <- Q100 <- U100 <- numeric(numSrc)
 spixI <- spixP <- rep(NA, numSrc)
 for(src_index in 1:numSrc){
     sourceName <- sourceList[src_index]
-    DF <- textDF[((textDF$Src == sourceName) & (difftime(Today, textDF$Date, units="days") < 60)) , ]
-    if(nrow(DF) < 6){ next }
-    bands <- unique(DF$Band)
+    srcDF <- textDF[((textDF$Src == sourceName) & (difftime(Today, textDF$Date, units="days") < 60)) , ]
+    if(nrow(srcDF) < 6){ next }
+    srcDF$deltaDay <- as.numeric(difftime(srcDF$Date, Today))
+    bands <- unique(srcDF$Band)
     numBand <- length(bands)
     predI <- predQ <- predU <- eI <- eQ <- eU <- numObs <- freq <- numeric(numBand)
     if(numBand > 1){
         for(band_index in 1:numBand){
-            fitDF <- DF[DF$Band == bands[band_index],]
+            fitDF <- srcDF[srcDF$Band == bands[band_index],]
+            fitDF <- fitDF[abs(fitDF$I - median(fitDF$I)) < 100.0* fitDF$eI,]
             numObs[band_index] <- nrow(fitDF)
-            deltaDay <- as.numeric(difftime(fitDF$Date, Today))
             BandTimeFit <- TRUE
             if( numObs[band_index] <= 2 ){ BandTimeFit <- FALSE }
+            if(BandTimeFit){ if(sd(fitDF$deltaDay) < min(abs(fitDF$deltaDay)) ){ BandTimeFit <- FALSE } }
             if( BandTimeFit ){
-                if(sd(deltaDay) < min(abs(deltaDay)) ){ BandTimeFit <- FALSE }
-            }
-            fitDF <- fitDF[abs(fitDF$I - median(fitDF$I)) < 100.0* fitDF$eI,]
-            if( BandTimeFit ){
-                fitDF$deltaDay <- as.numeric(difftime(fitDF$Date, Today))
                 fit <- lm(I ~ deltaDay, weights=1/eI^2/abs(deltaDay + 1), data=fitDF)
                 predI[band_index] <- summary(fit)$coefficients[1,'Estimate']
                 eI[band_index] <- summary(fit)$coefficients[1,'Std. Error']
@@ -275,10 +273,14 @@ for(src_index in 1:numSrc){
                 predU[band_index] <- summary(fit)$coefficients[1,'Estimate']
                 eU[band_index] <- summary(fit)$coefficients[1,'Std. Error']
             } else {
-                predI[band_index] <- mean(fitDF$I); predQ[band_index] <- mean(fitDF$Q); predU[band_index] <- mean(fitDF$U)
-                eI[band_index] <- median(fitDF$eI); eQ[band_index] <- median(fitDF$eQ); eU[band_index] <- median(fitDF$eU)
+                predI[band_index] <- mean(fitDF[fitDF$Band == bands[band_index],]$I)
+                predQ[band_index] <- mean(fitDF[fitDF$Band == bands[band_index],]$Q)
+                predU[band_index] <- mean(fitDF[fitDF$Band == bands[band_index],]$U)
+                eI[band_index]    <- median(fitDF[fitDF$Band == bands[band_index],]$eI)
+                eQ[band_index]    <- median(fitDF[fitDF$Band == bands[band_index],]$eQ)
+                eU[band_index]    <- median(fitDF[fitDF$Band == bands[band_index],]$eU)
             }
-            freq[band_index] <- median(fitDF$Freq)
+            freq[band_index]  <- median(fitDF[fitDF$Band == bands[band_index],]$Freq)
         }
         fit <- lm( log(predI) ~ log(freq/100), weights=1.0/eI^2 ); spixI[src_index] <- coef(fit)[2]; I100[src_index] <- exp(coef(fit)[1])
         fit <- lm(0.5*log(predQ^2 + predU^2) ~ log(freq/100), weights=1.0/eI^2 ); spixP[src_index] <- coef(fit)[2]
@@ -286,9 +288,9 @@ for(src_index in 1:numSrc){
         fit <- lm(predQ ~ f100+0, weights=1.0/eQ^2); Q100[src_index] <- coef(fit)[1]
         fit <- lm(predU ~ f100+0, weights=1.0/eU^2); U100[src_index] <- coef(fit)[1]
     } else {
-        I100[src_index] <- median(DF$I)
-        Q100[src_index] <- median(DF$Q)
-        U100[src_index] <- median(DF$U)
+        I100[src_index] <- median(srcDF$I)
+        Q100[src_index] <- median(srcDF$Q)
+        U100[src_index] <- median(srcDF$U)
         spixI[src_index] <- -0.7
         spixP[src_index] <- -0.7
     }
