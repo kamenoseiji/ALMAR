@@ -17,6 +17,15 @@ getBand <- function(fileList){
             return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
         },mc.cores=numCore)))
 }
+#-------- Read UID
+readUID <- function( Lines ){
+    UIDpointer <- grep("uid___", Lines)
+    return( strsplit(Lines[UIDpointer], '[ |,]')[[1]][2] )
+}
+readTsysDigital <- function( Lines ){
+    UIDpointer <- grep("TsysDigitalCorrection", Lines)
+    return( ifelse(length(UIDpointer) > 0, strsplit(Lines[UIDpointer], 'TsysDigitalCorrection ')[[1]][2], 'OFF') )
+}
 #-------- Find Calibrator name
 findCalibrator <- function( Lines ){
     SSOListPointer <- grep("Flux Calibrator is", Lines)
@@ -65,7 +74,7 @@ readAeffSection <- function(Lines){
 #-------- Read Aeff Section from a priori calibration
 readAeApriori <- function(Lines){
     pointer <- grep("Use J", Lines)[2]
-    FMT <- c('Ant', 'AeX', 'AeY', 'calibrator', 'EL', 'Date', 'sunset')
+    FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'UID', 'TsysCorr')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
     if( length(grep('^[A-Z]', Lines[pointer+1])) == 0 ){ return(DF) }
     strList = strsplit(Lines[pointer], '[ |=]+')[[1]]
@@ -174,12 +183,15 @@ SPL_period <- function(DF, refPeriod, weight=c(0,0)){
 }
 #-------- Read Aeff section and store into a data frame
 Log2Aeff <- function(fileName){
-    FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset')
+    cat(fileName)
+    FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'UID', 'TsysCorr')
     fileLines <- readLines(fileName)
     emptyDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]
     colnames(emptyDF) <- FMT
     if(length(fileLines) < 10){ return(emptyDF) }
     if(fileLines[1] == ''){ return(emptyDF) }
+    UID <- readUID(fileLines)
+    TsysCorr <- readTsysDigital(fileLines)
 	CalList <- findCalibrator(fileLines)
     if(CalList[[1]] == 0){ return(emptyDF) }
     if(CalList[[1]] > 0){
@@ -189,6 +201,8 @@ Log2Aeff <- function(fileName){
 	    emptyDF$EL <- CalList$EL
 	    emptyDF$Date <- CalList$UTC
 	    emptyDF$sunset <- CalList$sunset
+        emptyDF$UID <- UID
+        emptyDF$TsysCorr <- TsysCorr
     } else {
         emptyDF <- readAeApriori(fileLines)
         emptyDF$Band <- getBand(fileName)
@@ -214,13 +228,14 @@ fileList <- parseArg('fileList')
 #AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 DFList <- mclapply(fileList, Log2Aeff, mc.cores=numCore)
 AeDF <- do.call("rbind", DFList)
+save(AeDF, file='AeDF.Rdata')
 AeDF <- AeDF[complete.cases(AeDF$AeX),]
 AeDF <- AeDF[complete.cases(AeDF$AeY),]
 AeDF <- AeDF[((AeDF$AeX > 25.0) & (AeDF$AeX < 100.0) & (AeDF$AeY > 25.0) & (AeDF$AeY < 100.0)),]
 AeDF <- AeDF[complete.cases(AeDF$Date),]
 AeDF <- na.omit(AeDF)
 AeDF <- AeDF[order(AeDF$Date), ]
-save(AeDF, file='AeDF.Rdata')
+#save(AeDF, file='AeDF.Rdata')
 
 DFList <- mclapply(fileList, Log2Dterm, mc.cores=numCore)
 DtermDF <- do.call("rbind", DFList)
