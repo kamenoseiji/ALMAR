@@ -9,9 +9,11 @@ cd WORK
 \rm -rf *_files
 \rm -rf AMAPOLA
 \ls -la *Flux.log | awk '{if ($5 >= 1024) print $9}' > fileList
-/bin/Rscript ../StokesFluxStat.R fileList
-/bin/Rscript ../ReadAeff.R fileList
-/bin/Rscript ../StokesText.R
+/usr/local/bin/Rscript ../StokesFluxStat.R fileList
+/usr/local/bin/Rscript ../SSOUID.R
+#/usr/local/bin/Rscript ../ReadAeff.R fileList
+/usr/local/bin/Rscript ../ReadAeff.R UIDList
+/usr/local/bin/Rscript ../StokesText.R
 mkdir AMAPOLA
 mkdir AMAPOLA/PDF
 mkdir AMAPOLA/Table

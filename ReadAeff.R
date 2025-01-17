@@ -190,8 +190,10 @@ Log2Aeff <- function(fileName){
     colnames(emptyDF) <- FMT
     if(length(fileLines) < 10){ return(emptyDF) }
     if(fileLines[1] == ''){ return(emptyDF) }
-    UID <- readUID(fileLines)
     TsysCorr <- readTsysDigital(fileLines)
+    if(TsysCorr == 'OFF'){ return(emptyDF) }
+    UID <- readUID(fileLines)
+    if(fileLines[1] < 10){ return(emptyDF) }
 	CalList <- findCalibrator(fileLines)
     if(CalList[[1]] == 0){ return(emptyDF) }
     if(CalList[[1]] > 0){
@@ -222,9 +224,9 @@ Log2Dterm <- function(fileName){
     return(emptyDF)
 }
 #-------- Start program
-#Arguments <- commandArgs(trailingOnly = T)
-#fileList <- parseArg(Arguments)
-fileList <- parseArg('fileList')
+Arguments <- commandArgs(trailingOnly = T)
+fileList <- parseArg(Arguments)
+#fileList <- parseArg('fileList')
 #AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 DFList <- mclapply(fileList, Log2Aeff, mc.cores=numCore)
 AeDF <- do.call("rbind", DFList)
