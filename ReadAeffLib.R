@@ -28,46 +28,31 @@ readTsysDigital <- function( Lines ){
 }
 #-------- Find Calibrator name
 findCalibrator <- function( Lines ){
-    SSOListPointer <- grep("Flux Calibrator is", Lines)
-	if( length(SSOListPointer) == 0){
-        datePointer <- grep('EL', Lines)[1]
+    SSOListPointer <- grep("Aeff", Lines)
+    if( length(SSOListPointer) == 0){ return(list(0)) }
+    UsedSSOList <- vector(mode='character')
+    for(SSO in SSOlist){ if(length(grep(SSO, Lines[SSOListPointer])) > 0){ UsedSSOList[length(UsedSSOList)+1]  <- SSO}}
+    if( length(UsedSSOList) == 0){ return(list(0)) }
+    for(SSO in UsedSSOList){
+        datePointer <- grep(SSO, Lines[4:length(Lines)]) + 3
         fluxCalName <- strsplit(Lines[datePointer], '[ |=]+')[[1]][3]
         EL <- as.numeric(strsplit(Lines[datePointer], '[ |=]+')[[1]][5])
 	    scalerUTC <- strptime(strsplit(Lines[datePointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
     	sunsetUTC <- getSunlightTimes(as.Date(scalerUTC), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]
 		return(list(calibrator=fluxCalName, EL=EL, UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24))
     }
-    UsedSSOList <- SSOlist[SSOlist %in% strsplit(Lines[SSOListPointer], '[ |,]')[[1]]]
-    if(exists('scalerUTC')){ rm(scalerUTC) }
-    for(SSO in UsedSSOList){
-        if(exists('scalerUTC')){ break }
-        SSOpointer <- grep(paste(SSO, 'EL'), Lines)
-        if(length(SSOpointer) == 0){ next}
-        datePointer <- SSOpointer
-        while(length(grep('mean', Lines[datePointer]) ) == 0){ datePointer <- datePointer + 1}
-        lineData <- strsplit(Lines[datePointer], '[ |(|)|z]+')[[1]]
-        StokesI <- as.numeric(lineData[5])
-        errI    <- as.numeric(lineData[6])
-        if(StokesI / errI < 5.0){ next }
-        fluxCalName <- strsplit(Lines[SSOpointer], '[ |=]+')[[1]][3]
-        EL <- as.numeric(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][5])
-	    scalerUTC <- strptime(strsplit(Lines[SSOpointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
-    }
-	if(exists('scalerUTC')){
-    	sunsetUTC <- getSunlightTimes(as.Date(scalerUTC), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]
-		return(list(calibrator=fluxCalName, EL=EL, UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24))
-	} else {
-		return(list(0))
-	}
 }
 #-------- Read Aeff Section
 readAeffSection <- function(Lines){
 	pointer <- grep(" Aeff", Lines) + 1
     spwLabel <- strsplit(Lines[pointer - 1], '[ |:]+')[[1]]; spwLabel <- spwLabel[(which(spwLabel=='Aeff')+1):length(spwLabel)]
+    spwLabel <- spwLabel[grep('SPW', spwLabel)] 
     XspwList <- grep("-X", spwLabel) + 2; YspwList <- grep("-Y", spwLabel) + 2
     FMT <- c('Ant', 'AeX', 'AeY')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
-	while(length(grep('%', Lines[pointer])) > 0){
+	#while(length(grep('%', Lines[pointer])) > 0){
+	while( strsplit(Lines[pointer], ' ')[[1]][2] == ':'){
+        if( length(grep('--', Lines[pointer])) != 0 ){pointer <- pointer + 1; next}
         tmpDF <- data.frame(
             Ant = strsplit(Lines[pointer], ' ')[[1]][1],
             AeX = median(as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][XspwList])),
@@ -171,8 +156,9 @@ Log2Aeff <- function(fileName){
     colnames(emptyDF) <- FMT
     if(length(fileLines) < 10){ return(emptyDF) }
     if(fileLines[1] == ''){ return(emptyDF) }
-    UID <- readUID(fileLines)
     TsysCorr <- readTsysDigital(fileLines)
+    if(TsysCorr == 'OFF'){ return(emptyDF) }
+    UID <- readUID(fileLines)
 	CalList <- findCalibrator(fileLines)
 	emptyDF  <- readAeffSection(fileLines)
     emptyDF$Band <- getBand(fileName)
