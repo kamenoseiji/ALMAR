@@ -28,7 +28,17 @@ readTsysDigital <- function( Lines ){
 }
 #-------- Find Calibrator name
 findCalibrator <- function( Lines ){
-    SSOListPointer <- grep("Aeff", Lines)
+    SSOListPointer <- grep("Flux Calibrator is", Lines)
+    if( length(SSOListPointer) > 0){
+        fluxCalName <- strsplit(Lines[SSOListPointer], ' ')[[1]][4]
+        scalerUTC <- strptime(strsplit(Lines[SSOListPointer], ' ')[[1]][6], "%Y/%m/%d/%H:%M:%S")
+        sunsetUTC <- getSunlightTimes(as.Date(scalerUTC), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]
+        datePointer <- grep(fluxCalName, Lines)[2]
+        EL <- as.numeric(strsplit(Lines[datePointer], '[ |=]+')[[1]][5])
+		return(list(calibrator=fluxCalName, EL=EL, UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24))
+    } else {
+        SSOListPointer <- grep("Aeff", Lines)
+    }
     if( length(SSOListPointer) == 0){ return(list(0)) }
     UsedSSOList <- vector(mode='character')
     for(SSO in SSOlist){ if(length(grep(SSO, Lines[SSOListPointer])) > 0){ UsedSSOList[length(UsedSSOList)+1]  <- SSO}}
@@ -50,8 +60,8 @@ readAeffSection <- function(Lines){
     XspwList <- grep("-X", spwLabel) + 2; YspwList <- grep("-Y", spwLabel) + 2
     FMT <- c('Ant', 'AeX', 'AeY')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
-	#while(length(grep('%', Lines[pointer])) > 0){
-	while( strsplit(Lines[pointer], ' ')[[1]][2] == ':'){
+	while(length(grep('[--|%]',Lines[pointer])) > 0){
+	    if( strsplit(Lines[pointer], ' ')[[1]][2] != ':'){ break }
         if( length(grep('--', Lines[pointer])) != 0 ){pointer <- pointer + 1; next}
         tmpDF <- data.frame(
             Ant = strsplit(Lines[pointer], ' ')[[1]][1],
@@ -157,9 +167,11 @@ Log2Aeff <- function(fileName){
     if(length(fileLines) < 10){ return(emptyDF) }
     if(fileLines[1] == ''){ return(emptyDF) }
     TsysCorr <- readTsysDigital(fileLines)
-    if(TsysCorr == 'OFF'){ return(emptyDF) }
-    UID <- readUID(fileLines)
+    # if(TsysCorr == 'OFF'){ return(emptyDF) }
+    # UID <- readUID(fileLines)
+    UID <- strsplit(fileName, '[ |-]')[[1]][1]
 	CalList <- findCalibrator(fileLines)
+    if(CalList[[1]][1] == 0){ return(emptyDF) }
 	emptyDF  <- readAeffSection(fileLines)
     emptyDF$Band <- getBand(fileName)
     emptyDF$UID <- UID
