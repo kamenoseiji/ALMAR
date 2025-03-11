@@ -35,9 +35,9 @@ estimateIQUV <- function(DF, refFreq){
 #-------- Load Flux.Rdata from web
 Pthresh <- 0.03    # polarized flux > 30 mJy
 DateRange <- 60    # 60-day window
-#FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
-#load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
-load("Flux.Rdata")     # Data frame of FLDF
+FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
+load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
+#load("Flux.Rdata")     # Data frame of FLDF
 FLDF <- FLDF[as.Date(FLDF$Date) > Sys.Date() - DateRange,]  # Data frame within DateRange
 #-------- Filter quasars
 FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]
@@ -51,7 +51,7 @@ numSrc <- length(sourceList)
 #-------- Today's IQUV
 #for(band in seq(1, 9)){
 for(band in seq(1, 7)){
-    srcDF <- data.frame(Src = sourceList, RA=numeric(numSrc), DEC=numeric(numSrc), I=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), P=numeric(numSrc), EVPA=numeric(numSrc), LSTmin=numeric(numSrc), LSTmax=numeric(numSrc))
+    srcDF <- data.frame(Src = sourceList, RA=numeric(numSrc), DEC=numeric(numSrc), I=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), P=numeric(numSrc), EVPA=numeric(numSrc), LSTmin=numeric(numSrc), LSTmax=numeric(numSrc), png=character(numSrc))
     for(src in sourceList){
         #-------- Filter by polarized flux
         SDF <- FLDF[FLDF$Src == src,]
@@ -72,26 +72,33 @@ for(band in seq(1, 7)){
     cat(sprintf('Band %d : %d sources\n', band, nrow(srcDF)))
     for(index in 1:nrow(srcDF)){
         HA <- seq(-srcDF$ELHA[index], srcDF$ELHA[index], by=0.004)  # Hour angle for EL > 20 deg
+		HA_min <- min(HA); HA_max <- max(HA) - 2/24*2*pi	# tentative HA range
         sinHA <- sin(HA)
         cosHA <- cos(HA)
         cos_dec <- cos(srcDF$DEC[index])
         sin_dec <- sin(srcDF$DEC[index])
         PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BandPA[band]
         XYcorr <- srcDF$U[index]* cos(2.0*PA) - srcDF$Q[index]* sin(2.0*PA)
-        XX_YY  <- srcDF$Q[index]* cos(2.0*PA) + srcDF$U[index]* sin(2.0*PA)
-        XY_intercepts <- HA[which(diff(sign(XYcorr)) != 0)]      # hour angles of sign transition
-        XXYY_intercepts <- HA[which(diff(sign(XX_YY)) != 0)]     # hour angles of sign transition
-        intercepts <- sort(append(XY_intercepts,XXYY_intercepts))
-        intercepts <- intercepts[which(diff(intercepts) < 2/24*2*pi)]   # Exclude gap > 2 hours
-        if(length(intercepts) < 2){
+		XY_overthresh <- HA[which(abs(XYcorr) > Pthresh)]		# HA to obtain |XY| > Pthresh
+		HA_min <- max(min(XY_overthresh) - 2/24*2*pi, min(HA))
+		HA_max <- min(HA_max, max(XY_overthresh) - 2/24*2*pi)				# Cover > Pthresh within 2 hours
+        XY_intercepts <- HA[which(diff(sign(XYcorr)) != 0)]     # hour angles of sign transition
+		HA_min <- max(HA_min, min(XY_intercepts) - 2/24*2*pi)	# Cover zero-crossing within 2 hours 
+		HA_max <- min(HA_max, max(XY_intercepts)) - 0.026		# Cover zero-crossing 10 minutes ago
+        if( HA_min > HA_max ){
             srcDF$P[index] <- NA
             next
         }
-        srcDF$LSTmin[index] <- max(min(intercepts) - 0.26, -srcDF$ELHA[index])   # first intercept - 1 hour
-        srcDF$LSTmax[index] <- max(intercepts) - 0.04                            # last intercept - 10 minutes
+        srcDF$LSTmin[index] <- HA_min + srcDF$RA[index]   		# fist LST window
+        srcDF$LSTmax[index] <- HA_max + srcDF$RA[index]			# last LST window
+		pngFile <- sprintf('%s-Band%d-PA.png', srcDF$Src[index], band)
+		png(pngFile)
+		plot(HA, XYcorr, type='l', col='red', xlab='Hour Angle [rad]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', srcDF$Src[index], band))
+		abline(h=Pthresh, lty=2); abline(h=-Pthresh, lty=2); abline(v=XY_intercepts)
+		lines(c(HA_min, HA_max), c(0,0), lwd=4, col='blue')
+		dev.off()
+		srcDF$png[index] <- pngFile
     }
     srcDF <- na.omit(srcDF)
-    srcDF$LSTmin <- srcDF$LSTmin + srcDF$RA
-    srcDF$LSTmax <- srcDF$LSTmax + srcDF$RA
-    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
+    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax', 'png')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
 }
