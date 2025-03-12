@@ -7,7 +7,11 @@ ALMA_LONG <- -67.755* pi/180.0  # [radian]
 cos_phi <- cos(ALMA_LAT)
 sin_phi <- sin(ALMA_LAT)
 maxSinEL <- sin(86/180*pi)
-minSinEL <- sin(20/180*pi)
+minSinEL <- sin(30/180*pi)
+sessionDuration <- 3/12*pi	# 3 hours in [rad]
+pointingDuration <- 0.1/12*pi	# 0.1 hourss in [rad]
+Pthresh <- 0.05    # polarized flux > 50 mJy
+DateRange <- 60    # 60-day window
 #-------- # cos(hour angle) when it passes the given EL
 EL_HA <- function(sinEL, dec){
 	cosHA <- (sinEL - sin_phi* sin(dec)) / (cos_phi* cos(dec))
@@ -33,8 +37,6 @@ estimateIQUV <- function(DF, refFreq){
 	return( IQUV )
 }
 #-------- Load Flux.Rdata from web
-Pthresh <- 0.03    # polarized flux > 30 mJy
-DateRange <- 60    # 60-day window
 FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
 load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
 #load("Flux.Rdata")     # Data frame of FLDF
@@ -68,11 +70,10 @@ for(band in seq(1, 7)){
     srcDF <- srcDF[srcDF$DEC < ALMA_LAT + pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0* pi / 180,]  # avoid zenith passage
-    srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle when EL > 20 deg
-    cat(sprintf('Band %d : %d sources\n', band, nrow(srcDF)))
+    srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle above EL limit (30 deg)
     for(index in 1:nrow(srcDF)){
-        HA <- seq(-srcDF$ELHA[index], srcDF$ELHA[index], by=0.004)  # Hour angle for EL > 20 deg
-		HA_min <- min(HA); HA_max <- max(HA) - 2/24*2*pi	# tentative HA range
+        HA <- seq(-srcDF$ELHA[index], srcDF$ELHA[index], by=0.004)  # Hour angle above EL limit
+		HA_min <- min(HA); HA_max <- max(HA) - sessionDuration	# tentative HA range
         sinHA <- sin(HA)
         cosHA <- cos(HA)
         cos_dec <- cos(srcDF$DEC[index])
@@ -80,11 +81,13 @@ for(band in seq(1, 7)){
         PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BandPA[band]
         XYcorr <- srcDF$U[index]* cos(2.0*PA) - srcDF$Q[index]* sin(2.0*PA)
 		XY_overthresh <- HA[which(abs(XYcorr) > Pthresh)]		# HA to obtain |XY| > Pthresh
-		HA_min <- max(min(XY_overthresh) - 2/24*2*pi, min(HA))
-		HA_max <- min(HA_max, max(XY_overthresh) - 2/24*2*pi)				# Cover > Pthresh within 2 hours
         XY_intercepts <- HA[which(diff(sign(XYcorr)) != 0)]     # hour angles of sign transition
-		HA_min <- max(HA_min, min(XY_intercepts) - 2/24*2*pi)	# Cover zero-crossing within 2 hours 
-		HA_max <- min(HA_max, max(XY_intercepts)) - 0.026		# Cover zero-crossing 10 minutes ago
+		if(length(XY_overthresh) * length(XY_intercepts) == 0){
+            srcDF$P[index] <- NA
+            next
+		}
+		HA_min <- max(HA_min, min(XY_intercepts) - sessionDuration, min(XY_overthresh) - sessionDuration)	# Cover zero-crossing within 3 hours 
+		HA_max <- min(HA_max, max(XY_intercepts) - pointingDuration, max(XY_overthresh) - pointingDuration) # 
         if( HA_min > HA_max ){
             srcDF$P[index] <- NA
             next
@@ -100,5 +103,6 @@ for(band in seq(1, 7)){
 		srcDF$png[index] <- pngFile
     }
     srcDF <- na.omit(srcDF)
+    cat(sprintf('Band %d : %d sources\n', band, nrow(srcDF)))
     write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax', 'png')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
 }
