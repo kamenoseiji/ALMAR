@@ -125,7 +125,7 @@ textDF$Band <- getBand(textDF$File)
 #-------- Plot time-seried flux densities
 textDF$Src <- trimws(textDF$Src)
 #-------- HTML table of source flux
-recentDF <- textDF[Today - textDF$Date < recentTerm,]   # Recent 60 days
+recentDF <- textDF[as.Date(Today) - as.Date(textDF$Date) < recentTerm,]   # Recent 60 days
 bandList <- sort(unique(recentDF$Band))
 for(band in bandList){
     bandDF <- recentDF[recentDF$Band == band,]
