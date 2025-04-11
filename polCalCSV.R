@@ -8,8 +8,9 @@ cos_phi <- cos(ALMA_LAT)
 sin_phi <- sin(ALMA_LAT)
 maxSinEL <- sin(86/180*pi)
 minSinEL <- sin(30/180*pi)
-sessionDuration <- 3/12*pi	# 3 hours in [rad]
-pointingDuration <- 0.1/12*pi	# 0.1 hourss in [rad]
+hourPerRad <- 12/pi		# radian to hour angle conversion
+sessionDuration <- 3/hourPerRad	# 3 hours in [rad]
+pointingDuration <- 0.1/hourPerRad	# 0.1 hourss in [rad]
 Pthresh <- 0.05    # polarized flux > 50 mJy
 DateRange <- 60    # 60-day window
 #-------- # cos(hour angle) when it passes the given EL
@@ -37,9 +38,9 @@ estimateIQUV <- function(DF, refFreq){
 	return( IQUV )
 }
 #-------- Load Flux.Rdata from web
-FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
-load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
-#load("Flux.Rdata")     # Data frame of FLDF
+#FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
+#load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
+load("Flux.Rdata")     # Data frame of FLDF
 FLDF <- FLDF[as.Date(FLDF$Date) > Sys.Date() - DateRange,]  # Data frame within DateRange
 #-------- Filter quasars
 FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]
@@ -96,13 +97,14 @@ for(band in seq(1, 7)){
         srcDF$LSTmax[index] <- HA_max + srcDF$RA[index]			# last LST window
 		pngFile <- sprintf('%s-Band%d-PA.png', srcDF$Src[index], band)
 		png(pngFile)
-		plot(HA, XYcorr, type='l', col='red', xlab='Hour Angle [rad]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', srcDF$Src[index], band))
-		abline(h=Pthresh, lty=2); abline(h=-Pthresh, lty=2); abline(v=XY_intercepts)
-		lines(c(HA_min, HA_max), c(0,0), lwd=4, col='blue')
+		plot(HA*hourPerRad, XYcorr, type='l', col='red', xlab='Hour Angle [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', srcDF$Src[index], band))
+		grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
+		abline(h=Pthresh, lty=2); abline(h=-Pthresh, lty=2); abline(v=hourPerRad* XY_intercepts)
+		lines(c(HA_min, HA_max)*hourPerRad, c(0,0), lwd=4, col='blue')
 		dev.off()
 		srcDF$png[index] <- pngFile
     }
     srcDF <- na.omit(srcDF)
     cat(sprintf('Band %d : %d sources\n', band, nrow(srcDF)))
-    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax', 'png')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
+    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
 }

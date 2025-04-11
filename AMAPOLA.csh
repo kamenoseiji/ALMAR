@@ -1,9 +1,11 @@
 rsync -auvz skameno@ssh.alma.cl:/home/skameno/public_html/Grid/Stokes/ WORK/
 cd WORK
 \rm *.Rdata
+\rm *.png
 \rm *.pdf
 \rm *.table
 \rm *.CSV
+\rm *.csv
 \rm *.html
 \rm -rf *_files
 \rm -rf AMAPOLA
@@ -17,7 +19,6 @@ mkdir AMAPOLA
 mkdir AMAPOLA/PDF
 mkdir AMAPOLA/PNG
 mkdir AMAPOLA/Table
-cp ../HTML/*.txt AMAPOLA
 cp ../HTML/*.html AMAPOLA
 cp -r ../HTML/resources AMAPOLA
 cp -r ../HTML/images AMAPOLA
@@ -25,11 +26,11 @@ cp Flux.Rdata AMAPOLA
 cp AeDF.Rdata AMAPOLA
 cp Dterm.Rdata AMAPOLA
 cp amapola.txt AMAPOLA
-mv PolCalBand*.csv AMAPOLA
-mv *.png AMAPOLA/PNG
-mv *.pdf AMAPOLA/PDF
+cp PolCalBand*.csv AMAPOLA
+cp *.png AMAPOLA/PNG
+cp *.pdf AMAPOLA/PDF
 mv *.table AMAPOLA/Table
-mv *.html AMAPOLA
+cp *.html AMAPOLA
 mv common.flux_files AMAPOLA
 mv J*.flux_files AMAPOLA
 mv Band*LSTplot_files AMAPOLA
