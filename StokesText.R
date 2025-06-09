@@ -296,7 +296,7 @@ for(src_index in 1:numSrc){
     }
 }
 srcDF <- na.omit(data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP))
-write.csv(srcDF[(abs(srcDF$DEC - ALMA_lat) > 4.0*pi/180.0),], 'PolQuery.CSV', row.names=FALSE)
+write.csv(srcDF[(abs(srcDF$DEC - ALMA_lat) > 4.0*pi/180.0),], 'PolQuery.CSV', row.names=FALSE, digits=6)
 #-------- LST plot
 for(band in c(1,3,4,5,6,7,8,9)){
     plotDF <- plotLST(srcDF, band)

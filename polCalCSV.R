@@ -106,5 +106,5 @@ for(band in seq(1, 7)){
     }
     srcDF <- na.omit(srcDF)
     cat(sprintf('Band %d : %d sources\n', band, nrow(srcDF)))
-    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
+    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE, digits=6)
 }
