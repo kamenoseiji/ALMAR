@@ -1,4 +1,5 @@
 library(RColorBrewer)
+library(dplyr)
 library(xtable)
 library(plotly, warn.conflicts=FALSE)
 library(pandoc)
@@ -93,7 +94,7 @@ plotLST <- function(DF, band){
     }
     return(pDF)
 }
-#-------- Starging Process
+#-------- Starting Process
 load('Flux.Rdata')
 FLDF <- FLDF[FLDF$eI > 1e-5,]
 FLDF$Band <- getBand(FLDF$File)
@@ -107,7 +108,8 @@ recLength <- diff(c(recBorder, recNum+1) )
 recMat <- matrix(c(recBorder,   c(tail(recBorder, n=length(recBorder)-1)-1, recNum) ), ncol=2) 
 tempDF <- apply(recMat, 1, sliceDF)
 result <- mclapply(tempDF, predStokes, mc.cores=numCore)
-textDF <- do.call("rbind", result)
+#textDF <- do.call("rbind", result)
+textDF <- bind_rows(result)
 textDF <- na.omit(textDF)
 textDF$P <- sqrt(textDF$Q^2 + textDF$U^2)
 sigmaSQ <- sqrt(textDF$eQ * textDF$eU + (textDF$I* sysPerr)^2)
@@ -136,7 +138,8 @@ for(band in bandList){
         DF <- bandDF[bandDF$Src == source, ]
         return(data.frame(Src=source, numObs = nrow(DF), I = median(DF$I), eI = sd(DF$I), Q = median(DF$Q), eQ = sd(DF$Q), U = median(DF$U), eU=sd(DF$U)))
     }, mc.cores=numCore)
-    srcDF <- na.omit(do.call("rbind", srcDF))
+    #srcDF <- na.omit(do.call("rbind", srcDF))
+    srcDF <- na.omit(bind_rows(srcDF))
     if(nrow(srcDF) == 0){next}
     srcDF$P  <- sqrt(srcDF$Q^2 + srcDF$U^2)
     srcDF$eP <- sqrt(srcDF$eQ^2 + srcDF$eU^2)
@@ -296,7 +299,7 @@ for(src_index in 1:numSrc){
     }
 }
 srcDF <- na.omit(data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP))
-write.csv(srcDF[(abs(srcDF$DEC - ALMA_lat) > 4.0*pi/180.0),], 'PolQuery.CSV', row.names=FALSE, digits=6)
+write.csv(format(srcDF[(abs(srcDF$DEC - ALMA_lat) > 4.0*pi/180.0),], digits=6), 'PolQuery.CSV', row.names=FALSE)
 #-------- LST plot
 for(band in c(1,3,4,5,6,7,8,9)){
     plotDF <- plotLST(srcDF, band)
