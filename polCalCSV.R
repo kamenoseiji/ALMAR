@@ -30,7 +30,7 @@ estimateIQUV <- function(DF, refFreq){
         fitI <- lm(formula=log(I) ~ relTime + log(relFreq), data=DF, weight=(I / eI)^2 * (timeWeightSoftening / abs(relTime + timeWeightSoftening)) )
 	    fitP <- lm(formula=log(P) ~ relTime + log(relFreq), data=DF, weight=(P/eP)^2 * (timeWeightSoftening / abs(relTime + timeWeightSoftening)))
     }
-    weight <- 1.0/(abs(DF$eEVPA)^2 * abs(log(DF$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(DF$relTime + timeWeightSoftening)))
+    weight <- 1.0/(abs(DF$eEVPA) * sqrt(DF$eQ^2 + DF$eU^2)* abs(log(DF$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(DF$relTime + timeWeightSoftening)))
     Twiddle <- sum( weight* exp((0.0 + 2.0i)*DF$EVPA) ) / sum(weight); Twiddle <- Twiddle/abs(Twiddle)
     IQUV <- data.frame(Src=DF$Src[1], I=exp(coef(fitI)[[1]]), Q=0.0, U=0.0, V=0.0, P=exp(coef(fitP)[[1]]), EVPA=0.5*Arg(Twiddle))
     IQUV$Q <- IQUV$P* Re(Twiddle)
@@ -58,6 +58,8 @@ for(band in seq(1, 7)){
     for(src in sourceList){
         #-------- Filter by polarized flux
         SDF <- FLDF[FLDF$Src == src,]
+        SDF <- SDF[SDF$eI < 0.1* SDF$I,]
+        SDF <- SDF[SDF$eP < 0.5* SDF$P,]
         IQUV <- estimateIQUV(SDF, BandFreq[band])
         srcDF[srcDF$Src == src,]$I <- IQUV$I
         srcDF[srcDF$Src == src,]$Q <- IQUV$Q

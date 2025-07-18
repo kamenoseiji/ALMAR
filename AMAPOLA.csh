@@ -34,5 +34,6 @@ cp *.html AMAPOLA
 mv common.flux_files AMAPOLA
 mv J*.flux_files AMAPOLA
 mv Band*LSTplot_files AMAPOLA
+#rsync -a --safe-links --delete AMAPOLA skameno@ssh.alma.cl:/home/skameno/public_html/
 rsync -a --safe-links AMAPOLA skameno@ssh.alma.cl:/home/skameno/public_html/
 cd ..
