@@ -28,7 +28,7 @@ estimateIQUV <- function(DF, refFreq){
     if( (diff(range(DF$relTime)) < 0.25* DateRange* SECPERDAY) | (max(DF$relTime) < -0.25* SECPERDAY)){      # small number of data
         fitI <- lm(formula=log(I) ~ log(relFreq), data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
 	    fitP <- lm(formula=log(P) ~ log(relFreq), data=DF, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
-    } else {
+   } else {
         fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
 	    fitP <- lm(formula=log(P) ~ log(relFreq) + relTime, data=DF, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
     }
@@ -54,7 +54,6 @@ FLDF$relTime <- as.numeric(FLDF$Date) - as.numeric(as.POSIXct(Sys.time()))  # Re
 sourceList <- sort(unique(FLDF$Src))
 numSrc <- length(sourceList)
 #-------- Today's IQUV
-#for(band in seq(1, 9)){
 for(band in seq(1, 7)){
     srcDF <- data.frame(Src = sourceList, RA=numeric(numSrc), DEC=numeric(numSrc), I=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), P=numeric(numSrc), EVPA=numeric(numSrc), LSTmin=numeric(numSrc), LSTmax=numeric(numSrc), png=character(numSrc))
     for(src in sourceList){
@@ -111,4 +110,26 @@ for(band in seq(1, 7)){
     srcDF <- na.omit(srcDF)
     cat(sprintf('Band %d : %d sources\n', band, nrow(srcDF)))
     write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
+	pngFile <- sprintf('Band%d-LST.png', band)
+    png(pngFile, width=1536, height=1024)
+    par(mar=c(4,8,3,3))
+    LSTplot <- barplot(height=rep(NA, nrow(srcDF)), names=srcDF$Src, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('Polarization Calibrators at Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
+    grid(nx=24, ny=0, lwd=0.5, lty=1, col='gray')
+    for(index in 1:nrow(srcDF)){ abline(h=LSTplot[index], col='black', lwd=0.5)}
+    arrows(hourPerRad* srcDF$LSTmin, LSTplot, hourPerRad* srcDF$LSTmax, LSTplot, length=0, lwd=12, col='red')
+    for(index in 1:nrow(srcDF)){
+        if( srcDF$LSTmin[index] < 0.0){
+            arrows(hourPerRad* srcDF$LSTmin[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=12, col='red')
+            text(hourPerRad*srcDF$LSTmin[index] + 24.0, LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmin[index] + 24.0), pos=2) 
+        } else {
+            text(hourPerRad*srcDF$LSTmin[index], LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmin[index]), pos=2) 
+        }
+        if( srcDF$LSTmax[index] > 2.0*pi){
+            arrows(0.0, LSTplot[index], hourPerRad* srcDF$LSTmax[index] - 24.0, LSTplot[index], length=0, lwd=12, col='red')
+            text(hourPerRad*srcDF$LSTmax[index] - 24.0, LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmax[index] - 24.0), pos=4) 
+        } else {
+            text(hourPerRad*srcDF$LSTmax[index], LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmax[index]), pos=4) 
+        }
+    }
+    dev.off()
 }
