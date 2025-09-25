@@ -6,7 +6,14 @@ library(htmlwidgets)   # multicore parallelization
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
 BandFreq<-c(43.0,  75.0, 97.5, 132.0,183.0, 233.0, 343.5,400.0, 650.0, 800.0)
-Pthresh <-c(0.044,0.042,0.040, 0.044,0.049, 0.044, 0.078,0.132, 0.433, 0.653)     # 5-sigma thresholds for polarized flux
+Pthresh <-c(0.058, 0.060, 0.069, 0.058, 0.086, 0.077, 0.094, 0.153, 0.442, 0.765) # 5-sigma thresholds for polarized flux
+# sigma <- function(integ,tsys){
+#    ae <- 0.7*pi*9
+#    nant <- 10
+#    kb <- 1380
+#    bw <- 16e6
+#    return(2*kb*tsys/(ae*sqrt(nant*(nant-1)*bw*integ*2)))}
+# 5.0* sigma( c(150, 200, 200, 300, 300, 300, 600, 900, 1200, 1200), c(55,65,75,77,115,103,178,353,1179,2041) )
 mthresh <- 0.03                                                                   # polarization degree threshold
 SECPERDAY <- 86400
 ALMA_LAT <- -23.029* pi/180.0   # [radian]
