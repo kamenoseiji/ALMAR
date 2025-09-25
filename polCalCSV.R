@@ -1,8 +1,12 @@
+library(RColorBrewer)
+library(plotly, warn.conflicts=FALSE)
+library(pandoc)
+library(htmlwidgets)   # multicore parallelization
 #-------- FE-specific PA
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
-BandFreq <- c(43.0, 75.0, 97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
-Pthresh  <- c(0.06, 0.07, 0.07, 0.08, 0.10, 0.09, 0.13, 0.3, 1.1, 1.7)     # thresholds for polarized flux
+BandFreq<-c(43.0,  75.0, 97.5, 132.0,183.0, 233.0, 343.5,400.0, 650.0, 800.0)
+Pthresh <-c(0.06,  0.07, 0.07,  0.08, 0.10,  0.09,  0.13,  0.3,   1.1, 1.7)     # thresholds for polarized flux
 SECPERDAY <- 86400
 ALMA_LAT <- -23.029* pi/180.0   # [radian]
 ALMA_LONG <- -67.755* pi/180.0  # [radian]
@@ -18,6 +22,18 @@ DateRange <- 60    # 60-day window
 EL_HA <- function(sinEL, dec){
 	cosHA <- (sinEL - sin_phi* sin(dec)) / (cos_phi* cos(dec))
 	return(cosHA)
+}
+#-------- Hour angle to Az, El
+ha2azel <-function(ha, phi=ALMA_LAT, dec=0){
+    # ha2azel : Calculate Azimuth, Elevation, and Parallactic Angle
+    # ha  : Hour Angle
+    # phi : Latitude of the site [rad]
+    # dec : Declination of the source [rad]
+    sin_el <- sin(phi)* sin(dec) + cos(phi)* cos(dec)* cos(ha)
+    el <- asin(sin_el)
+    az <- atan2(cos(dec)*sin(ha), sin(phi)*cos(dec)*cos(ha) - cos(phi)*sin(dec)) + pi
+    pa <- atan2(sin(ha), tan(phi)*cos(dec) - sin(dec)* cos(ha))
+    return(data.frame(ha=ha, az=az, el=el, pa=pa))
 }
 #-------- Estimate Stokes parameters by freqneyc and date 
 estimateIQUV <- function(DF, refFreq){
@@ -39,18 +55,49 @@ estimateIQUV <- function(DF, refFreq){
     IQUV$U <- IQUV$P* Im(Twiddle)
 	return( IQUV )
 }
+#-------- Plot LST
+plotLST <- function(DF, band){
+    pDF <- data.frame()
+    DF <- DF[abs(DF$DEC - ALMA_LAT) > 4.0*pi/180.0,]    # zenith avoidance of 4 degree
+    sourceList <- as.character(DF$Src)
+    sourceNum <- length(sourceList)
+    LST <- seq(0.0, 23.95, 0.05)
+    lstNum <- length(LST)
+    for(source_index in 1:sourceNum){
+        src <- sourceList[source_index]
+        HA <- LST*pi/12 - DF$RA[source_index]
+        AZEL <- ha2azel( HA, ALMA_LAT, DF$DEC[source_index] )
+        AZEL$pa <- AZEL$pa + BandPA[band]
+        CS <- cos(2.0* AZEL$pa); SN <- sin(2.0* AZEL$pa)
+        AZEL$XYcorr <- abs(DF$U[source_index]*CS - DF$Q[source_index]*SN)
+        AZEL[AZEL$el < pi/7.5,]$XYcorr <- NA
+        if( nrow(pDF) == 0 ){
+            pDF <- data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr)
+        } else {
+            pDF <- rbind(pDF, data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr))
+        }
+    }
+    return(pDF)
+}
 #-------- Load Flux.Rdata from web
 #FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
 #load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
 load("Flux.Rdata")     # Data frame of FLDF
 FLDF <- FLDF[as.Date(FLDF$Date) > Sys.Date() - DateRange,]  # Data frame within DateRange
 #-------- Filter quasars
-FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]
+FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]    # only quasars
 FLDF$P  <- sqrt(FLDF$Q^2 + FLDF$U^2)
 FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
 FLDF$EVPA  <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P^2)
 FLDF$relTime <- as.numeric(FLDF$Date) - as.numeric(as.POSIXct(Sys.time()))  # Relative second since now
+sourceList <- sort(unique(FLDF$Src))
+numSrc <- length(sourceList)
+FLDF$medP <- FLDF$freqRange <- numeric(nrow(FLDF))
+for(src in sourceList){ FLDF[FLDF$Src == src,]$medP <- median(FLDF[FLDF$Src == src,]$P)}
+for(src in sourceList){ FLDF[FLDF$Src == src,]$freqRange <- diff(range(FLDF[FLDF$Src == src,]$Freq))}
+FLDF <- FLDF[FLDF$medP > 0.03,]
+FLDF <- FLDF[FLDF$freqRange > 100,]
 sourceList <- sort(unique(FLDF$Src))
 numSrc <- length(sourceList)
 #-------- Today's IQUV
@@ -59,8 +106,10 @@ for(band in seq(1, 7)){
     for(src in sourceList){
         #-------- Filter by polarized flux
         SDF <- FLDF[FLDF$Src == src,]
-        SDF <- SDF[SDF$eI < 0.1* SDF$I,]
-        SDF <- SDF[SDF$eP < 0.5* SDF$P,]
+        SDF <- SDF[SDF$I < median(SDF$I) + 3.0* sd(SDF$I),]
+        SDF <- SDF[SDF$P < median(SDF$P) + 3.0* sd(SDF$P),]
+        if(nrow(SDF) < 3){ next }
+        #cat(sprintf('%s %f\n', src, max(SDF$Freq)))
         IQUV <- estimateIQUV(SDF, BandFreq[band])
         srcDF[srcDF$Src == src,]$I <- IQUV$I
         srcDF[srcDF$Src == src,]$Q <- IQUV$Q
@@ -75,6 +124,14 @@ for(band in seq(1, 7)){
     srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0* pi / 180,]  # avoid zenith passage
     srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle above EL limit (30 deg)
+    #-------- LST plot
+    plotDF <- plotLST(srcDF, band)
+    pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
+    pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (60-day statistics)', band, as.character(Sys.Date())))
+    htmlFile <- sprintf("Band%d_LSTplot.html", band)
+    htmlwidgets::saveWidget(pLST, htmlFile, selfcontained=FALSE)
+    rm(plotDF)
+    #-------- LST window plot
     for(index in 1:nrow(srcDF)){
         HA <- seq(-srcDF$ELHA[index], srcDF$ELHA[index], by=0.004)  # Hour angle above EL limit
 		HA_min <- min(HA); HA_max <- max(HA) - sessionDuration	# tentative HA range

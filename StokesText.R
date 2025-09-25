@@ -22,38 +22,6 @@ numCore = detectCores()
 #-------- Functions
 srcDfFilter  <- function(source){ return(FLDF[FLDF$Src == source,])}
 scanDfFilter <- function(scan){ return(FLDF[FLDF$Date == scan,])}
-#-------- Estimate Stokes parameters by freqneyc and date 
-estimateIQUV <- function(DF, refFreq){
-    DF$relFreq <- DF$Freq / refFreq
-    timeWeightSoftening <- 5* 86400 # 5-day softening
-    if( (max(DF$relFreq) < 0.65) | (max(DF$relFreq) / min(DF$relFreq) < 2.0 )){ return( data.frame( Src=DF$Src[1], I=0.0, Q=0.0, U=0.0, V=0.0, P=0.0, EVPA=0.0))}
-    DF$timeFreqDeparture <- (abs(DF$relTime) + timeWeightSoftening) * (1.0 + abs(DF$relFreq - 1))
-    if( (diff(range(DF$relTime)) < 0.25* DateRange* SECPERDAY) | (max(DF$relTime) < -0.25* SECPERDAY)){      # small number of data
-        fitI <- lm(formula=log(I) ~ log(relFreq), data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
-        fitP <- lm(formula=log(P) ~ log(relFreq), data=DF, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
-   } else {
-        fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
-        fitP <- lm(formula=log(P) ~ log(relFreq) + relTime, data=DF, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
-    }
-    weight <- 1.0/(abs(DF$eEVPA) * sqrt(DF$eQ^2 + DF$eU^2)* abs(log(DF$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(DF$relTime + timeWeightSoftening)))
-    Twiddle <- sum( weight* exp((0.0 + 2.0i)*DF$EVPA) ) / sum(weight); Twiddle <- Twiddle/abs(Twiddle)
-    IQUV <- data.frame(Src=DF$Src[1], I=exp(coef(fitI)[[1]]), Q=0.0, U=0.0, V=0.0, P=exp(coef(fitP)[[1]]), EVPA=0.5*Arg(Twiddle))
-    IQUV$Q <- IQUV$P* Re(Twiddle)
-    IQUV$U <- IQUV$P* Im(Twiddle)
-    return( IQUV )
-}
-#-------- Hour angle to Az, El
-ha2azel <-function(ha, phi=ALMA_lat, dec=0){
-	# ha2azel : Calculate Azimuth, Elevation, and Parallactic Angle
-	# ha  : Hour Angle
-	# phi : Latitude of the site [rad]
-	# dec : Declination of the source [rad]
-	sin_el <- sin(phi)* sin(dec) + cos(phi)* cos(dec)* cos(ha)
-	el <- asin(sin_el)
-	az <- atan2(cos(dec)*sin(ha), sin(phi)*cos(dec)*cos(ha) - cos(phi)*sin(dec)) + pi
-	pa <- atan2(sin(ha), tan(phi)*cos(dec) - sin(dec)* cos(ha))
-	return(data.frame(ha=ha, az=az, el=el, pa=pa))
-}
 #-------- Get band name
 getBand <- function(fileName){
     bandPointer <- regexpr("RB_[0-10]", fileName)
@@ -85,35 +53,6 @@ getBand <- function(fileList){
             bandPointer <- as.integer(regexpr("RB_[0-10]", fileName)[1])
             return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
         },mc.cores=numCore)))
-}
-#-------- Plot LST
-plotLST <- function(DF, band){
-    pDF <- data.frame()
-    DF <- DF[abs(DF$DEC - ALMA_lat) > 4.0*pi/180.0,]    # zenith avoidance of 4 degree
-    sourceList <- as.character(DF$Src)
-    sourceNum <- length(sourceList)
-    LST <- seq(0.0, 23.95, 0.05)
-    lstNum <- length(LST)
-    for(src in sourceList){
-        source_index <- which(DF$Src == src)
-        HA <- LST*pi/12 - DF$RA[source_index]
-        AZEL <- ha2azel( HA, ALMA_lat, DF$DEC[source_index] )
-        AZEL$pa <- AZEL$pa + BandPA[band]
-        CS <- cos(2.0* AZEL$pa); SN <- sin(2.0* AZEL$pa)
-        freqIFact <- (BandFreq[band] / 100)^DF$spixI[source_index]
-        freqPFact <- (BandFreq[band] / 100)^DF$spixP[source_index]
-        predQ <- DF$Q100[source_index]* freqPFact; predU <- DF$U100[source_index] *freqPFact
-        predP <- sqrt(predQ^2 + predU^2); predI <- DF$I100[source_index]* freqIFact
-        if((predP < 0.05) | (predP < 0.03* predI))  next
-        AZEL$XYcorr <- abs(predU*CS - predQ*SN)
-        AZEL[AZEL$el < pi/7.5,]$XYcorr <- NA
-        if( nrow(pDF) == 0 ){
-            pDF <- data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr)
-        } else {
-            pDF <- rbind(pDF, data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr))
-        }
-    }
-    return(pDF)
 }
 #-------- Starting Process
 load('Flux.Rdata')
@@ -260,66 +199,3 @@ for(sourceName in sourceList){
     text_sd <- sprintf('ln -s common.flux_files %s.flux_files', sourceName)
     system(text_sd)
 }
-#-------- Source 60-day statistics
-FLDF <- FLDF[as.Date(FLDF$Date) > Sys.Date() - DateRange,]  # Data frame within 60 days
-FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',] # Filter quasars
-FLDF$P  <- sqrt(FLDF$Q^2 + FLDF$U^2)
-FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
-FLDF$EVPA  <- 0.5* atan2(FLDF$U, FLDF$Q)
-FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P^2)
-FLDF$relTime <- as.numeric(FLDF$Date) - as.numeric(as.POSIXct(Sys.time()))  # Relative second since now
-sourceList <- sort(unique(FLDF$Src))
-numSrc <- length(sourceList)
-#-------- Filter by polarized flux
-FLDF$medP <- FLDF$freqRange <- numeric(nrow(FLDF))
-for(src in sourceList){ FLDF[FLDF$Src == src,]$medP <- median(FLDF[FLDF$Src == src,]$P)}
-for(src in sourceList){ FLDF[FLDF$Src == src,]$freqRange <- diff(range(FLDF[FLDF$Src == src,]$Freq))}
-FLDF <- FLDF[FLDF$medP > 0.04,]
-FLDF <- FLDF[FLDF$freqRange > 100,]
-sourceList <- sort(unique(FLDF$Src))
-numSrc <- length(sourceList)
-srcDF <- na.omit(data.frame(Src=sourceList, RA=numeric(numSrc), DEC=numeric(numSrc)))
-for(src in sourceList){
-    srcDF[srcDF$Src == src,]$RA  <- pi* (60.0* as.numeric(substring(src, 2, 3)) + as.numeric(substring(src, 4, 5))) / 720.0
-    srcDF[srcDF$Src == src,]$DEC <- pi* sign(as.numeric(substring(src, 6, 10)))* (as.numeric(substring(src, 7, 8)) + as.numeric(substring(src, 9, 10))/60.0) / 180.0
-}
-for(band in c(1,2,3,4,5,6,7,8,9)){
-    srcDF$I <- srcDF$Q <- srcDF$U <- srcDF$V <- rep(0.0, numSrc)
-    for(src in sourceList){
-        IQUV <- estimateIQUV(srcDF[srcDF$Src == src,], BandFreq[band])
-    
-
-#write.csv(format(srcDF[(abs(srcDF$DEC - ALMA_lat) > 4.0*pi/180.0),], digits=6), 'PolQuery.CSV', row.names=FALSE)
-}
-#if(0){
-##-------- LST plot
-#for(band in c(1,2,3,4,5,6,7,8,9)){
-#    IQUV <- mclapply(sourceList, function(source){
-#                DF <- FLDF[FLDF$Src == source,]
-#                DF$relFreq <- DF$Freq / BandFreq[band]
-#                
-#                
-#            }, mc.cores=numCore)
-#
-##textDF <- do.call("rbind", result)
-#textDF <- bind_rows(result)
-#    for(src in sourceList){
-#        IQUV <- estimateIQUV(FLDF[FLDF$Src == src,], BandFreq[band])
-#
-#    srcDF <- na.omit(data.frame(Src=sourceList, RA=RAList, DEC=DecList, I100=I100, Q100=Q100, U100=U100, spixI=spixI, spixP=spixP))
-#
-#    sourceList <- unique(bandDF$Src)
-#    sourceList <- sourceList[grep('^J[0-9]',sourceList)]
-#    srcDF <- mclapply(sourceList, function(source){
-#        DF <- bandDF[bandDF$Src == source, ]
-#        return(data.frame(Src=source, numObs = nrow(DF), I = median(DF$I), eI = sd(DF$I), Q = median(DF$Q), eQ = sd(DF$Q), U = median(DF$U), eU=sd(DF$U)))
-#    }, mc.cores=numCore)
-#
-#    bandDF <- 
-#    plotDF <- plotLST(srcDF, band)
-#    pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
-#    pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (60-day statistics)', band, as.character(Today)))
-#    htmlFile <- sprintf("Band%d_LSTplot.html", band)
-#    htmlwidgets::saveWidget(pLST, htmlFile, selfcontained=FALSE)
-#    rm(plotDF)
-#}
