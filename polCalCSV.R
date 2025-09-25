@@ -6,7 +6,8 @@ library(htmlwidgets)   # multicore parallelization
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
 BandFreq<-c(43.0,  75.0, 97.5, 132.0,183.0, 233.0, 343.5,400.0, 650.0, 800.0)
-Pthresh <-c(0.06,  0.07, 0.07,  0.08, 0.10,  0.09,  0.13,  0.3,   1.1, 1.7)     # thresholds for polarized flux
+Pthresh <-c(0.044,0.042,0.040, 0.044,0.049, 0.044, 0.078,0.132, 0.433, 0.653)     # 5-sigma thresholds for polarized flux
+mthresh <- 0.03                                                                   # polarization degree threshold
 SECPERDAY <- 86400
 ALMA_LAT <- -23.029* pi/180.0   # [radian]
 ALMA_LONG <- -67.755* pi/180.0  # [radian]
@@ -39,7 +40,7 @@ ha2azel <-function(ha, phi=ALMA_LAT, dec=0){
 estimateIQUV <- function(DF, refFreq){
     DF$relFreq <- DF$Freq / refFreq
     timeWeightSoftening <- 5* 86400 # 5-day softening
-    if( (max(DF$relFreq) < 0.65) | (max(DF$relFreq) / min(DF$relFreq) < 2.0 )){ return( data.frame( Src=DF$Src[1], I=0.0, Q=0.0, U=0.0, V=0.0, P=0.0, EVPA=0.0))}
+    if( (max(DF$relFreq) < 0.65) | (max(DF$relFreq) / min(DF$relFreq) < 2.0 )){ return( data.frame( Src=DF$Src[1], I=0.0, eI=0.0, Q=0.0, U=0.0, V=0.0, P=0.0, eP=0.0, EVPA=0.0))}
     DF$timeFreqDeparture <- (abs(DF$relTime) + timeWeightSoftening) * (1.0 + abs(DF$relFreq - 1))
     if( (diff(range(DF$relTime)) < 0.25* DateRange* SECPERDAY) | (max(DF$relTime) < -0.25* SECPERDAY)){      # small number of data
         fitI <- lm(formula=log(I) ~ log(relFreq), data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
@@ -50,7 +51,7 @@ estimateIQUV <- function(DF, refFreq){
     }
     weight <- 1.0/(abs(DF$eEVPA) * sqrt(DF$eQ^2 + DF$eU^2)* abs(log(DF$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(DF$relTime + timeWeightSoftening)))
     Twiddle <- sum( weight* exp((0.0 + 2.0i)*DF$EVPA) ) / sum(weight); Twiddle <- Twiddle/abs(Twiddle)
-    IQUV <- data.frame(Src=DF$Src[1], I=exp(coef(fitI)[[1]]), Q=0.0, U=0.0, V=0.0, P=exp(coef(fitP)[[1]]), EVPA=0.5*Arg(Twiddle))
+    IQUV <- data.frame(Src=DF$Src[1], I=exp(coef(fitI)[[1]]), eI=exp(coef(fitI)[[1]])* (exp(coef(summary(fitI))[1,2])-1), Q=0.0, U=0.0, V=0.0, P=exp(coef(fitP)[[1]]), eP=exp(coef(fitP)[[1]])* (exp(coef(summary(fitP))[1,2])-1), EVPA=0.5*Arg(Twiddle))
     IQUV$Q <- IQUV$P* Re(Twiddle)
     IQUV$U <- IQUV$P* Im(Twiddle)
 	return( IQUV )
@@ -102,7 +103,7 @@ sourceList <- sort(unique(FLDF$Src))
 numSrc <- length(sourceList)
 #-------- Today's IQUV
 for(band in seq(1, 7)){
-    srcDF <- data.frame(Src = sourceList, RA=numeric(numSrc), DEC=numeric(numSrc), I=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), P=numeric(numSrc), EVPA=numeric(numSrc), LSTmin=numeric(numSrc), LSTmax=numeric(numSrc), png=character(numSrc))
+    srcDF <- data.frame(Src = sourceList, RA=numeric(numSrc), DEC=numeric(numSrc), I=numeric(numSrc), eI=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), P=numeric(numSrc), eP=numeric(numSrc), EVPA=numeric(numSrc), LSTmin=numeric(numSrc), LSTmax=numeric(numSrc), png=character(numSrc))
     for(src in sourceList){
         #-------- Filter by polarized flux
         SDF <- FLDF[FLDF$Src == src,]
@@ -112,18 +113,15 @@ for(band in seq(1, 7)){
         #cat(sprintf('%s %f\n', src, max(SDF$Freq)))
         IQUV <- estimateIQUV(SDF, BandFreq[band])
         srcDF[srcDF$Src == src,]$I <- IQUV$I
+        srcDF[srcDF$Src == src,]$eI<- IQUV$eI
         srcDF[srcDF$Src == src,]$Q <- IQUV$Q
         srcDF[srcDF$Src == src,]$U <- IQUV$U
         srcDF[srcDF$Src == src,]$P <- IQUV$P
+        srcDF[srcDF$Src == src,]$eP<- IQUV$eP
         srcDF[srcDF$Src == src,]$EVPA <- IQUV$EVPA
         srcDF[srcDF$Src == src,]$RA  <- pi* (60.0* as.numeric(substring(src, 2, 3)) + as.numeric(substring(src, 4, 5))) / 720.0
         srcDF[srcDF$Src == src,]$DEC <- pi* sign(as.numeric(substring(src, 6, 10)))* (as.numeric(substring(src, 7, 8)) + as.numeric(substring(src, 9, 10))/60.0) / 180.0
     }
-    srcDF <- srcDF[srcDF$P > Pthresh[band],]  # filter by polarized flux
-    srcDF <- srcDF[srcDF$DEC < ALMA_LAT + pi/3,]  # max EL > 30 deg
-    srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
-    srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0* pi / 180,]  # avoid zenith passage
-    srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle above EL limit (30 deg)
     #-------- LST plot
     plotDF <- plotLST(srcDF, band)
     pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
@@ -132,6 +130,12 @@ for(band in seq(1, 7)){
     htmlwidgets::saveWidget(pLST, htmlFile, selfcontained=FALSE)
     rm(plotDF)
     #-------- LST window plot
+    srcDF <- srcDF[(srcDF$P - srcDF$eP) / (srcDF$I + srcDF$eI) > mthresh,]  # filter by polarization degree
+    srcDF <- srcDF[srcDF$P - srcDF$eP > Pthresh[band],]  # filter by polarized flux
+    srcDF <- srcDF[srcDF$DEC < ALMA_LAT + pi/3,]  # max EL > 30 deg
+    srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
+    srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0* pi / 180,]  # avoid zenith passage
+    srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle above EL limit (30 deg)
     for(index in 1:nrow(srcDF)){
         HA <- seq(-srcDF$ELHA[index], srcDF$ELHA[index], by=0.004)  # Hour angle above EL limit
 		HA_min <- min(HA); HA_max <- max(HA) - sessionDuration	# tentative HA range
