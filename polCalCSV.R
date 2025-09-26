@@ -130,7 +130,7 @@ for(band in seq(1, 7)){
         srcDF[srcDF$Src == src,]$DEC <- pi* sign(as.numeric(substring(src, 6, 10)))* (as.numeric(substring(src, 7, 8)) + as.numeric(substring(src, 9, 10))/60.0) / 180.0
     }
     #-------- LST plot
-    plotDF <- plotLST(srcDF, band)
+    plotDF <- plotLST(srcDF[srcDF$P - srcDF$eP > Pthresh/2, ], band)
     pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
     pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (60-day statistics)', band, as.character(Sys.Date())))
     htmlFile <- sprintf("Band%d_LSTplot.html", band)
