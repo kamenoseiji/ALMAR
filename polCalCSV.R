@@ -6,7 +6,8 @@ library(htmlwidgets)   # multicore parallelization
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
 BandFreq<-c(43.0,  75.0, 97.5, 132.0,183.0, 233.0, 343.5,400.0, 650.0, 800.0)
-Pthresh <-c(0.058, 0.060, 0.069, 0.058, 0.086, 0.077, 0.094, 0.153, 0.442, 0.765) # 5-sigma thresholds for polarized flux
+Pthresh7  <-c(0.058, 0.060, 0.069, 0.058, 0.086, 0.077, 0.094, 0.153, 0.442, 0.765) # for 7m array, 5-sigma thresholds for polarized flux
+Pthresh12 <- 0.5* Pthresh7     # for 12m array 
 # sigma <- function(integ,tsys){
 #    ae <- 0.7*pi*9
 #    nant <- 10
@@ -110,7 +111,7 @@ sourceList <- sort(unique(FLDF$Src))
 numSrc <- length(sourceList)
 #-------- Today's IQUV
 for(band in seq(1, 7)){
-    srcDF <- data.frame(Src = sourceList, RA=numeric(numSrc), DEC=numeric(numSrc), I=numeric(numSrc), eI=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), P=numeric(numSrc), eP=numeric(numSrc), EVPA=numeric(numSrc), LSTmin=numeric(numSrc), LSTmax=numeric(numSrc), png=character(numSrc))
+    srcDF <- data.frame(Src = sourceList, RA=numeric(numSrc), DEC=numeric(numSrc), I=numeric(numSrc), eI=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), P=numeric(numSrc), eP=numeric(numSrc), EVPA=numeric(numSrc), LSTmin=numeric(numSrc), LSTmax=numeric(numSrc), LSTmin7=rep(1e6, numSrc), LSTmax7=rep(-1e6, numSrc), png=character(numSrc))
     for(src in sourceList){
         #-------- Filter by polarized flux
         SDF <- FLDF[FLDF$Src == src,]
@@ -130,7 +131,7 @@ for(band in seq(1, 7)){
         srcDF[srcDF$Src == src,]$DEC <- pi* sign(as.numeric(substring(src, 6, 10)))* (as.numeric(substring(src, 7, 8)) + as.numeric(substring(src, 9, 10))/60.0) / 180.0
     }
     #-------- LST plot
-    plotDF <- plotLST(srcDF[srcDF$P - srcDF$eP > Pthresh/2, ], band)
+    plotDF <- plotLST(srcDF[srcDF$P - srcDF$eP > Pthresh12[band], ], band)
     pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
     pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (60-day statistics)', band, as.character(Sys.Date())))
     htmlFile <- sprintf("Band%d_LSTplot.html", band)
@@ -138,7 +139,7 @@ for(band in seq(1, 7)){
     rm(plotDF)
     #-------- LST window plot
     srcDF <- srcDF[(srcDF$P - srcDF$eP) / (srcDF$I + srcDF$eI) > mthresh,]  # filter by polarization degree
-    srcDF <- srcDF[srcDF$P - srcDF$eP > Pthresh[band],]  # filter by polarized flux
+    srcDF <- srcDF[srcDF$P - srcDF$eP > Pthresh12[band],]  # filter by polarized flux
     srcDF <- srcDF[srcDF$DEC < ALMA_LAT + pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0* pi / 180,]  # avoid zenith passage
@@ -152,26 +153,37 @@ for(band in seq(1, 7)){
         sin_dec <- sin(srcDF$DEC[index])
         PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BandPA[band]
         XYcorr <- srcDF$U[index]* cos(2.0*PA) - srcDF$Q[index]* sin(2.0*PA)
-		XY_overthresh <- HA[which(abs(XYcorr) > Pthresh[band])]		# HA to obtain |XY| > Pthresh
+		XY_overthresh12 <- HA[which(abs(XYcorr) > Pthresh12[band])]		# HA to obtain |XY| > Pthresh (12m)
+		XY_overthresh7  <- HA[which(abs(XYcorr) > Pthresh7[band])]		# HA to obtain |XY| > Pthresh (7m)
         XY_intercepts <- HA[which(diff(sign(XYcorr)) != 0)]     # hour angles of sign transition
-		if(length(XY_overthresh) * length(XY_intercepts) == 0){
+		if(length(XY_overthresh12) * length(XY_intercepts) == 0){
             srcDF$P[index] <- NA
             next
 		}
-		HA_min <- max(HA_min, min(XY_intercepts) - sessionDuration, min(XY_overthresh) - sessionDuration)	# Cover zero-crossing within 3 hours 
-		HA_max <- min(HA_max, max(XY_intercepts) - pointingDuration, max(XY_overthresh) - pointingDuration) # 
+		HA_min <- max(HA_min, min(XY_intercepts) - sessionDuration, min(XY_overthresh12) - sessionDuration)	# Cover zero-crossing within 3 hours 
+		HA_max <- min(HA_max, max(XY_intercepts) - pointingDuration, max(XY_overthresh12) - pointingDuration) # 
         if( HA_min > HA_max ){
             srcDF$P[index] <- NA
             next
         }
         srcDF$LSTmin[index] <- HA_min + srcDF$RA[index]   		# fist LST window
         srcDF$LSTmax[index] <- HA_max + srcDF$RA[index]			# last LST window
+		if(length(XY_overthresh7) * length(XY_intercepts) > 0){
+		    HA_min7 <- max(HA_min, min(XY_intercepts) - sessionDuration, min(XY_overthresh7) - sessionDuration)	# Cover zero-crossing within 3 hours 
+		    HA_max7 <- min(HA_max, max(XY_intercepts) - pointingDuration, max(XY_overthresh7) - pointingDuration) # 
+            srcDF$LSTmin7[index] <- HA_min7 + srcDF$RA[index]   		# fist LST window
+            srcDF$LSTmax7[index] <- HA_max7 + srcDF$RA[index]			# last LST window
+        }
 		pngFile <- sprintf('%s-Band%d-PA.png', srcDF$Src[index], band)
 		png(pngFile)
 		plot(HA*hourPerRad, XYcorr, type='l', col='red', xlab='Hour Angle [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', srcDF$Src[index], band))
 		grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
-		abline(h=Pthresh[band], lty=2); abline(h=-Pthresh[band], lty=2); abline(v=hourPerRad* XY_intercepts)
+		abline(h=Pthresh12[band], lty=2, col='blue'); abline(h=-Pthresh12[band], lty=2, col='blue'); abline(h=Pthresh7[band], lty=2, col='red'); abline(h=-Pthresh7[band], lty=2, col='red'); abline(v=hourPerRad* XY_intercepts)
+		lines(c(HA_min, HA_max)*hourPerRad, c(0,0), lwd=2, col='blue')
+        if( srcDF$LSTmin7[index] < srcDF$LSTmax7[index] ){ lines(c(HA_min7, HA_max7)*hourPerRad, c(0,0), lwd=12, col='red') }
 		lines(c(HA_min, HA_max)*hourPerRad, c(0,0), lwd=4, col='blue')
+        text(HA_min*hourPerRad, Pthresh12[band], '12-m threshold', col='blue', pos=4)
+        text(HA_min*hourPerRad, Pthresh7[band], '7-m threshold', col='red', pos=4)
 		dev.off()
 		srcDF$png[index] <- pngFile
     }
@@ -183,20 +195,28 @@ for(band in seq(1, 7)){
     par(mar=c(4,8,3,3))
     LSTplot <- barplot(height=rep(NA, nrow(srcDF)), names=srcDF$Src, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('Polarization Calibrators at Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
     grid(nx=24, ny=0, lwd=0.5, lty=1, col='gray')
-    for(index in 1:nrow(srcDF)){ abline(h=LSTplot[index], col='black', lwd=0.5)}
-    arrows(hourPerRad* srcDF$LSTmin, LSTplot, hourPerRad* srcDF$LSTmax, LSTplot, length=0, lwd=12, col='red')
     for(index in 1:nrow(srcDF)){
+        segColor <- ifelse(srcDF$P[index] - srcDF$eP[index] > Pthresh7[band], 'red', 'blue')
+        segWidth <- min(c(100*srcDF$P[index], 20))
+        abline(h=LSTplot[index], col='black', lwd=0.5)
+        arrows(hourPerRad* srcDF$LSTmin[index], LSTplot[index], hourPerRad* srcDF$LSTmax[index], LSTplot[index], length=0, lwd=segWidth, col='blue')
         if( srcDF$LSTmin[index] < 0.0){
-            arrows(hourPerRad* srcDF$LSTmin[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=12, col='red')
+            arrows(hourPerRad* srcDF$LSTmin[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='blue')
             text(hourPerRad*srcDF$LSTmin[index] + 24.0, LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmin[index] + 24.0), pos=2) 
         } else {
             text(hourPerRad*srcDF$LSTmin[index], LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmin[index]), pos=2) 
         }
         if( srcDF$LSTmax[index] > 2.0*pi){
-            arrows(0.0, LSTplot[index], hourPerRad* srcDF$LSTmax[index] - 24.0, LSTplot[index], length=0, lwd=12, col='red')
+            arrows(0.0, LSTplot[index], hourPerRad* srcDF$LSTmax[index] - 24.0, LSTplot[index], length=0, lwd=segWidth, col='blue')
             text(hourPerRad*srcDF$LSTmax[index] - 24.0, LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmax[index] - 24.0), pos=4) 
         } else {
             text(hourPerRad*srcDF$LSTmax[index], LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmax[index]), pos=4) 
+        }
+        legend('right',  legend=c('12-m or 7-m Array','Only 12-m Array'), col=c('red','blue'), lty=1, lwd=segWidth)
+        if(srcDF$LSTmin7[index] < 4.0* pi){
+            arrows(hourPerRad* srcDF$LSTmin7[index], LSTplot[index], hourPerRad* srcDF$LSTmax7[index], LSTplot[index], length=0, lwd=segWidth, col='red')
+            if( srcDF$LSTmin7[index] < 0.0){ arrows(hourPerRad* srcDF$LSTmin7[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')}
+            if( srcDF$LSTmin7[index] > 2.0* pi){ arrows(0.0, LSTplot[index], hourPerRad* srcDF$LSTmax7[index] - 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')}
         }
     }
     dev.off()
