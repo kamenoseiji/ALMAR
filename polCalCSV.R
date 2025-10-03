@@ -6,7 +6,7 @@ library(htmlwidgets)   # multicore parallelization
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
 BandFreq<-c(43.0,  75.0, 97.5, 132.0,183.0, 233.0, 343.5,400.0, 650.0, 800.0)
-Pthresh7  <-c(0.058, 0.060, 0.069, 0.058, 0.086, 0.077, 0.094, 0.153, 0.442, 0.765) # for 7m array, 5-sigma thresholds for polarized flux
+Pthresh7<-c(0.058, 0.060, 0.069, 0.058, 0.086, 0.077, 0.094, 0.153, 0.442, 0.765) # for 7m array, 5-sigma thresholds for polarized flux
 Pthresh12 <- 0.5* Pthresh7     # for 12m array 
 # sigma <- function(integ,tsys){
 #    ae <- 0.7*pi*9
