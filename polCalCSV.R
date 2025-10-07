@@ -116,6 +116,8 @@ HArange <- function(df, thresh12, thresh7, BPA){
     XY_overthresh  <- HA[which(abs(XYcorr) > thresh12)]     # HA to obtain |XY| > Pthresh (12m)
     XY_overthresh7 <- HA[which(abs(XYcorr) > thresh7)]     # HA to obtain |XY| > Pthresh (7m)
     XY_intercepts <- HA[which(diff(sign(XYcorr)) != 0)]     # hour angles of sign transition
+    XY_transit12 <- HA[which(diff(sign(abs(XYcorr) - thresh12)) != 0.0)]
+    XY_transit7  <- HA[which(diff(sign(abs(XYcorr) - thresh7)) != 0.0)]
     if(length(XY_overthresh) * length(XY_intercepts) == 0){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # HA_min12, HA_max12, HAmin7, HAmax7
     df$HA12min <- max(df$HA12min, min(XY_intercepts) - sessionDuration, min(XY_overthresh) - sessionDuration)	# Cover zero-crossing within 3 hours 
 	df$HA12max <- min(df$HA12max, max(XY_intercepts) - pointingDuration, max(XY_overthresh) - pointingDuration) # 
@@ -126,10 +128,13 @@ HArange <- function(df, thresh12, thresh7, BPA){
 	plot((HA + df$RA)*hourPerRad, XYcorr, type='l', col='darkgreen', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', df$Src, band))
 	grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
 	abline(h=thresh12, lty=2, col='blue'); abline(h=-thresh12, lty=2, col='blue'); abline(h=thresh7, lty=2, col='red'); abline(h=-thresh7, lty=2, col='red'); abline(v=hourPerRad* (XY_intercepts + df$RA))
-	lines((c(df$HA7min, df$HA7max) + df$RA)*hourPerRad, c(0,0), lwd=12, col='red')
-	lines((c(df$HA12min, df$HA12max) + df$RA)*hourPerRad, c(0,0), lwd=4, col='blue')
-    text((df$HA12min + df$RA)*hourPerRad, thresh12, '12-m threshold', col='blue', pos=4)
-    text((df$HA12min + df$RA)*hourPerRad, thresh7, '7-m threshold', col='red', pos=4)
+	lines((c(df$HA7min, df$HA7max) + df$RA)*hourPerRad, c(0,0), lwd=12, col='red'); text((df$HA7min+df$RA)*hourPerRad, 0.0, sprintf('%.1fh', (df$HA7min+df$RA)*hourPerRad), pos=3, col='red'); text((df$HA7max+df$RA)*hourPerRad, 0.0, sprintf('%.1fh', (df$HA7max+df$RA)*hourPerRad), pos=3, col='red')
+	lines((c(df$HA12min, df$HA12max) + df$RA)*hourPerRad, c(0,0), lwd=4, col='blue'); text((df$HA12min+df$RA)*hourPerRad, 0.0, sprintf('%.1fh', (df$HA12min+df$RA)*hourPerRad), pos=1, col='blue'); text((df$HA12max+df$RA)*hourPerRad, 0.0, sprintf('%.1fh', (df$HA12max+df$RA)*hourPerRad), pos=1, col='blue')
+    text((min(HA)+df$RA)*hourPerRad+0.1, thresh12, '12-m threshold', col='blue', pos=3)
+    text((min(HA)+df$RA)*hourPerRad+0.1, thresh7, '7-m threshold', col='red', pos=3)
+    for(intercept in XY_intercepts){ text((intercept + df$RA)*hourPerRad, min(XYcorr), sprintf('%.1fh', (intercept + df$RA)*hourPerRad), pos=4, srt=90) }
+    for(transit in XY_transit12){ text((transit + df$RA)*hourPerRad, XYcorr[HA==transit], sprintf('%.1fh', (transit + df$RA)*hourPerRad), adj=0, col='blue') }
+    for(transit in XY_transit7){ text((transit + df$RA)*hourPerRad, XYcorr[HA==transit], sprintf('%.1fh', (transit + df$RA)*hourPerRad), adj=0, col='red') }
     df[LSTpointer:(LSTpointer+3)] <- df[HApointer:(HApointer+3)] + df$RA
     return( df )
 }
@@ -194,7 +199,7 @@ for(band in seq(1, 7)){
     srcDF$png <- ''
     for(index in 1:nrow(srcDF)){
 		pngFile <- sprintf('%s-Band%d-PA.png', srcDF$Src[index], band)
-		png(pngFile)
+		png(pngFile, width=1024, height=768)
         srcDF[index,] <- HArange(srcDF[index,], Pthresh12[band], Pthresh7[band], BandPA[band])
 		dev.off()
 		srcDF$png[index] <- pngFile
