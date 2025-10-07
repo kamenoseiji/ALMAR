@@ -123,13 +123,13 @@ HArange <- function(df, thresh12, thresh7, BPA){
         df$HA7min  <- max(df$HA7min,  min(XY_intercepts) - sessionDuration, min(XY_overthresh7) - sessionDuration)	# Cover zero-crossing within 3 hours 
 	    df$HA7max  <- min(df$HA7max,  max(XY_intercepts) - pointingDuration, max(XY_overthresh7) - pointingDuration) # 
     } else { df$HA7min <- df$HA7max <- NA }
-	plot(HA*hourPerRad, XYcorr, type='l', col='darkgreen', xlab='Hour Angle [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', df$Src, band))
+	plot((HA + df$RA)*hourPerRad, XYcorr, type='l', col='darkgreen', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', df$Src, band))
 	grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
-	abline(h=thresh12, lty=2, col='blue'); abline(h=-thresh12, lty=2, col='blue'); abline(h=thresh7, lty=2, col='red'); abline(h=-thresh7, lty=2, col='red'); abline(v=hourPerRad* XY_intercepts)
-	lines(c(df$HA7min, df$HA7max)*hourPerRad, c(0,0), lwd=12, col='red')
-	lines(c(df$HA12min, df$HA12max)*hourPerRad, c(0,0), lwd=4, col='blue')
-    text(df$HA12min*hourPerRad, thresh12, '12-m threshold', col='blue', pos=4)
-    text(df$HA12min*hourPerRad, thresh7, '7-m threshold', col='red', pos=4)
+	abline(h=thresh12, lty=2, col='blue'); abline(h=-thresh12, lty=2, col='blue'); abline(h=thresh7, lty=2, col='red'); abline(h=-thresh7, lty=2, col='red'); abline(v=hourPerRad* (XY_intercepts + df$RA))
+	lines((c(df$HA7min, df$HA7max) + df$RA)*hourPerRad, c(0,0), lwd=12, col='red')
+	lines((c(df$HA12min, df$HA12max) + df$RA)*hourPerRad, c(0,0), lwd=4, col='blue')
+    text((df$HA12min + df$RA)*hourPerRad, thresh12, '12-m threshold', col='blue', pos=4)
+    text((df$HA12min + df$RA)*hourPerRad, thresh7, '7-m threshold', col='red', pos=4)
     df[LSTpointer:(LSTpointer+3)] <- df[HApointer:(HApointer+3)] + df$RA
     return( df )
 }
