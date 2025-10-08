@@ -128,3 +128,4 @@ FLDF$eV <- sqrt(FLDF$eV^2 + (sysPerr*FLDF$V)^2)
 FLDF$Date <- as.POSIXct(FLDF$Date, tz="GMT")
 FLDF <- FLDF[order(FLDF$Date),]
 save(FLDF, file='Flux.Rdata')
+largeErrorEBs <- unique( FLDF[((substr(FLDF$Src,1,1) == 'J') & (FLDF$eI > 10)),]$File)

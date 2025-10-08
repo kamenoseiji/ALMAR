@@ -24,7 +24,7 @@ sin_phi <- sin(ALMA_LAT)
 maxSinEL <- sin(86/180*pi)
 minSinEL <- sin(30/180*pi)
 hourPerRad <- 12/pi		# radian to hour angle conversion
-sessionDuration <- 3/hourPerRad	# 3 hours in [rad]
+sessionDuration <- 3.0/hourPerRad	# 3 hours in [rad]
 pointingDuration <- 0.1/hourPerRad	# 0.1 hourss in [rad]
 DateRange <- 60    # 60-day window
 #-------- # cos(hour angle) when it passes the given EL
@@ -101,7 +101,7 @@ srcFreqCalibrator <- function(DF, band){
     }
     srcDF$RA  <- pi* (60.0* as.numeric(substring(sourceList, 2, 3)) + as.numeric(substring(sourceList, 4, 5))) / 720.0
     srcDF$DEC <- pi* sign(as.numeric(substring(sourceList, 6, 10)))* (as.numeric(substring(sourceList, 7, 8)) + as.numeric(substring(sourceList, 9, 10))/60.0) / 180.0
-    return( srcDF[srcDF$P > Pthresh12[band],] )
+    return( srcDF[((srcDF$P - srcDF$eP > Pthresh12[band]) & ((srcDF$P - srcDF$eP)/(srcDF$I + srcDF$eI) > 0.03)),] )
 }
 #-------- HA range over threshold
 HArange <- function(df, thresh12, thresh7, BPA){
