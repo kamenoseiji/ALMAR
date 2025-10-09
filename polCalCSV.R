@@ -17,13 +17,15 @@ Pthresh12 <- 0.5* Pthresh7     # for 12m array
 # 5.0* sigma( c(150, 200, 200, 300, 300, 300, 600, 900, 1200, 1200), c(55,65,75,77,115,103,178,353,1179,2041) )
 mthresh <- 0.03                                                                   # polarization degree threshold
 SECPERDAY <- 86400
-ALMA_LAT <- -23.029* pi/180.0   # [radian]
-ALMA_LONG <- -67.755* pi/180.0  # [radian]
+hourPerRad <- 12/pi		# radian to hour angle conversion
+RADDEG <- 180.0/pi
+HAresolution <- 0.0025 # [radian] 0.0025 rad = 34.38 s
+ALMA_LAT <- -23.029 / RADDEG  # [radian]
+ALMA_LONG <- -67.755/ RADDEG  # [radian]
 cos_phi <- cos(ALMA_LAT)
 sin_phi <- sin(ALMA_LAT)
-maxSinEL <- sin(86/180*pi)
-minSinEL <- sin(30/180*pi)
-hourPerRad <- 12/pi		# radian to hour angle conversion
+maxSinEL <- sin(86/RADDEG)
+minSinEL <- sin(30/RADDEG)
 sessionDuration <- 3.0/hourPerRad	# 3 hours in [rad]
 pointingDuration <- 0.1/hourPerRad	# 0.1 hourss in [rad]
 DateRange <- 60    # 60-day window
@@ -67,21 +69,21 @@ estimateIQUV <- function(DF, refFreq){
 #-------- Plot LST
 plotLST <- function(DF, band){
     pDF <- data.frame()
-    DF <- DF[abs(DF$DEC - ALMA_LAT) > 4.0*pi/180.0,]    # zenith avoidance of 4 degree
+    DF <- DF[abs(DF$DEC - ALMA_LAT) > 4.0/RADDEG,]    # zenith avoidance of 4 degree
     sourceList <- as.character(DF$Src)
     sourceNum <- length(sourceList)
     LST <- seq(0.0, 23.95, 0.05)
     lstNum <- length(LST)
     for(source_index in 1:sourceNum){
         src <- sourceList[source_index]
-        HA <- LST*pi/12 - DF$RA[source_index]
+        HA <- LST/hourPerRad - DF$RA[source_index]
         AZEL <- ha2azel( HA, ALMA_LAT, DF$DEC[source_index] )
         AZEL$pa <- AZEL$pa + BandPA[band]
         CS <- cos(2.0* AZEL$pa); SN <- sin(2.0* AZEL$pa)
         AZEL$XYcorr <- abs(DF$U[source_index]*CS - DF$Q[source_index]*SN)
-        AZEL[AZEL$el < pi/7.5,]$XYcorr <- NA
+        AZEL[AZEL$el < pi/7.5,]$XYcorr <- NA        # flag EL < 24 deg out
         if( nrow(pDF) == 0 ){
-            pDF <- data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr)
+            pDF <- data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*RADDEG, XYcorr=AZEL$XYcorr)
         } else {
             pDF <- rbind(pDF, data.frame(LST=LST, Src=rep(src, lstNum), EL=AZEL$el*180/pi, XYcorr=AZEL$XYcorr))
         }
@@ -95,47 +97,57 @@ srcFreqCalibrator <- function(DF, band){
     srcDF <- data.frame(Src=sourceList, I=numeric(numSrc), eI=numeric(numSrc), Q=numeric(numSrc), U= numeric(numSrc), V=numeric(numSrc), P=numeric(numSrc), eP=numeric(numSrc), EVPA=numeric(numSrc))
     for(src_index in 1:numSrc){
         src <- sourceList[src_index]
-        SDF <- DF[((DF$Src == src) & (DF$I < median(DF$I) + 3.0* sd(DF$I)) & (DF$P < median(DF$P) + 3.0* sd(DF$P))),]
+        SDF <- DF[((DF$Src == src) & (DF$I < median(DF$I) + 3.0* sd(DF$I)) & (DF$P < median(DF$P) + 3.0* sd(DF$P))),]   # Filter reliable data
         if(nrow(SDF) < 3){ next }
         srcDF[src_index,] <- estimateIQUV(SDF, BandFreq[band])
     }
     srcDF$RA  <- pi* (60.0* as.numeric(substring(sourceList, 2, 3)) + as.numeric(substring(sourceList, 4, 5))) / 720.0
     srcDF$DEC <- pi* sign(as.numeric(substring(sourceList, 6, 10)))* (as.numeric(substring(sourceList, 7, 8)) + as.numeric(substring(sourceList, 9, 10))/60.0) / 180.0
-    return( srcDF[((srcDF$P - srcDF$eP > Pthresh12[band]) & ((srcDF$P - srcDF$eP)/(srcDF$I + srcDF$eI) > 0.03)),] )
+    return( srcDF[((srcDF$P - srcDF$eP > Pthresh12[band]) & ((srcDF$P - srcDF$eP)/(srcDF$I + srcDF$eI) > 0.03)),] )     # Filter by polarized flux and polarization degree
 }
 #-------- HA range over threshold
 HArange <- function(df, thresh12, thresh7, BPA){
-    HA <- seq(-df$ELHA, df$ELHA, by=0.004)  # Hour angle above EL limit
-    df$HA12min <- df$HA7min <- min(HA); df$HA12max <- df$HA7max <- max(HA) - sessionDuration  # tentative HA range
+    cos_dec <- cos(df$DEC); sin_dec <- sin(df$DEC)
+    df$HA12min <- df$HA7min <- -df$ELHA; df$HA12max <- df$HA7max <- df$ELHA - sessionDuration  # tentative HA range, to assure EL > 30 deg for sessionDuration (3 hours)
     HApointer  <- which(names(srcDF) == 'HA12min')
     LSTpointer <- which(names(srcDF) == 'LSTmin')
+    if( df$HA12min > df$HA12max ){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # No valid HA and LST
+    HA <- seq(-df$ELHA, df$ELHA + HAresolution, by=HAresolution)  # Hour angle above EL limit
     sinHA <- sin(HA); cosHA <- cos(HA)
-    cos_dec <- cos(df$DEC); sin_dec <- sin(df$DEC)
-    PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BPA
-    XYcorr <- df$U* cos(2.0*PA) - df$Q* sin(2.0*PA)
-    XY_overthresh  <- HA[which(abs(XYcorr) > thresh12)]     # HA to obtain |XY| > Pthresh (12m)
-    XY_overthresh7 <- HA[which(abs(XYcorr) > thresh7)]     # HA to obtain |XY| > Pthresh (7m)
-    XY_intercepts <- HA[which(diff(sign(XYcorr)) != 0)]     # hour angles of sign transition
-    XY_transit12 <- HA[which(diff(sign(abs(XYcorr) - thresh12)) != 0.0)]
-    XY_transit7  <- HA[which(diff(sign(abs(XYcorr) - thresh7)) != 0.0)]
-    if(length(XY_overthresh) * length(XY_intercepts) == 0){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # HA_min12, HA_max12, HAmin7, HAmax7
-    df$HA12min <- max(df$HA12min, min(XY_intercepts) - sessionDuration, min(XY_overthresh) - sessionDuration)	# Cover zero-crossing within 3 hours 
-	df$HA12max <- min(df$HA12max, max(XY_intercepts) - pointingDuration, max(XY_overthresh) - pointingDuration) # 
-    if(length(XY_overthresh7) * length(XY_intercepts) > 0){
-        df$HA7min  <- max(df$HA7min,  min(XY_intercepts) - sessionDuration, min(XY_overthresh7) - sessionDuration)	# Cover zero-crossing within 3 hours 
-	    df$HA7max  <- min(df$HA7max,  max(XY_intercepts) - pointingDuration, max(XY_overthresh7) - pointingDuration) # 
-    } else { df$HA7min <- df$HA7max <- NA }
-	plot((HA + df$RA)*hourPerRad, XYcorr, type='l', col='darkgreen', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', df$Src, band))
+    PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BPA   # Parallactic angle + BandPA
+    calDF <- data.frame(HA=HA, PA=PA, XYcorr=df$U* cos(2.0*PA) - df$Q* sin(2.0*PA))
+    calDF12 <- calDF[abs(calDF$XYcorr) > thresh12,]
+    if(nrow(calDF12) < 1){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # Not available for 12m array
+    calDF7  <- calDF[abs(calDF$XYcorr) > thresh7,]
+    if(nrow(calDF7) < 1){ df[(HApointer+2):(HApointer+3)] <- df[(LSTpointer+2):(LSTpointer+3)] <- NA}   # Not available for 7m array
+    HA_intercepts <- HA[which(diff(sign(calDF$XYcorr)) != 0)]     # hour angles of sign transition
+    if(length(HA_intercepts) < 1){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # No zero-intercept
+    XY_transit12 <- HA[which(diff(sign(abs(calDF$XYcorr) - thresh12)) != 0.0)]  # XYcorr straddles threshold
+    df$HA12min <- max(df$HA12min, min(HA_intercepts) - sessionDuration, min(calDF12$HA) - sessionDuration)	 # Cover zero-crossing within 3 hours 
+	df$HA12max <- min(df$HA12max, max(HA_intercepts) - pointingDuration, max(calDF12$HA) - pointingDuration) # 
+    df$LSTmin <- df$HA12min + df$RA 
+    df$LSTmax <- df$HA12max + df$RA 
+    if(nrow(calDF7) > 1){
+        XY_transit7 <- HA[which(diff(sign(abs(calDF$XYcorr) - thresh7)) != 0.0)]  # XYcorr straddles threshold
+        df$HA7min <- max(df$HA7min, min(HA_intercepts) - sessionDuration, min(calDF7$HA) - sessionDuration)	 # Cover zero-crossing within 3 hours 
+	    df$HA7max <- min(df$HA7max, max(HA_intercepts) - pointingDuration, max(calDF7$HA) - pointingDuration) # 
+        df$LST7min <- df$HA7min + df$RA 
+        df$LST7max <- df$HA7max + df$RA 
+    }
+	plot((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, type='l', col='darkgreen', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', df$Src, band))
 	grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
-	abline(h=thresh12, lty=2, col='blue'); abline(h=-thresh12, lty=2, col='blue'); abline(h=thresh7, lty=2, col='red'); abline(h=-thresh7, lty=2, col='red'); abline(v=hourPerRad* (XY_intercepts + df$RA))
-	lines((c(df$HA7min, df$HA7max) + df$RA)*hourPerRad, c(0,0), lwd=12, col='red'); text((df$HA7min+df$RA)*hourPerRad, 0.0, sprintf('%.1fh', (df$HA7min+df$RA)*hourPerRad), pos=3, col='red'); text((df$HA7max+df$RA)*hourPerRad, 0.0, sprintf('%.1fh', (df$HA7max+df$RA)*hourPerRad), pos=3, col='red')
-	lines((c(df$HA12min, df$HA12max) + df$RA)*hourPerRad, c(0,0), lwd=4, col='blue'); text((df$HA12min+df$RA)*hourPerRad, 0.0, sprintf('%.1fh', (df$HA12min+df$RA)*hourPerRad), pos=1, col='blue'); text((df$HA12max+df$RA)*hourPerRad, 0.0, sprintf('%.1fh', (df$HA12max+df$RA)*hourPerRad), pos=1, col='blue')
+	abline(h=thresh12, lty=2, col='blue'); abline(h=-thresh12, lty=2, col='blue'); abline(h=thresh7, lty=2, col='red'); abline(h=-thresh7, lty=2, col='red'); abline(v=hourPerRad* (HA_intercepts + df$RA))
+    if(nrow(calDF7) > 1){
+	    lines(c(df$LST7min, df$LST7max)*hourPerRad, c(0,0), lwd=12, col='red'); text(df$LST7min*hourPerRad, 0.0, sprintf('%.1fh', df$LST7min*hourPerRad), pos=3, col='red'); text(df$LST7max*hourPerRad, 0.0, sprintf('%.1fh', df$LST7max*hourPerRad), pos=3, col='red')
+    }
+	lines(c(df$LSTmin, df$LSTmax)*hourPerRad, c(0,0), lwd=4, col='blue'); text(df$LSTmin*hourPerRad, 0.0, sprintf('%.1fh', df$LSTmin*hourPerRad), pos=1, col='blue'); text(df$LSTmax*hourPerRad, 0.0, sprintf('%.1fh', df$LSTmax*hourPerRad), pos=1, col='blue')
     text((min(HA)+df$RA)*hourPerRad+0.1, thresh12, '12-m threshold', col='blue', pos=3)
     text((min(HA)+df$RA)*hourPerRad+0.1, thresh7, '7-m threshold', col='red', pos=3)
-    for(intercept in XY_intercepts){ text((intercept + df$RA)*hourPerRad, min(XYcorr), sprintf('%.1fh', (intercept + df$RA)*hourPerRad), pos=4, srt=90) }
-    for(transit in XY_transit12){ text((transit + df$RA)*hourPerRad, XYcorr[HA==transit], sprintf('%.1fh', (transit + df$RA)*hourPerRad), adj=0, col='blue') }
-    for(transit in XY_transit7){ text((transit + df$RA)*hourPerRad, XYcorr[HA==transit], sprintf('%.1fh', (transit + df$RA)*hourPerRad), adj=0, col='red') }
-    df[LSTpointer:(LSTpointer+3)] <- df[HApointer:(HApointer+3)] + df$RA
+    for(intercept in HA_intercepts){ text((intercept + df$RA)*hourPerRad, min(calDF$XYcorr), sprintf('%.1fh', (intercept + df$RA)*hourPerRad), pos=4, srt=90) }
+    for(transit in XY_transit12){ text((transit + df$RA)*hourPerRad, calDF[calDF$HA == transit,]$XYcorr, sprintf('%.1fh', (transit + df$RA)*hourPerRad), adj=0, col='blue') }
+    if(nrow(calDF7) > 1){
+        for(transit in XY_transit7){ text((transit + df$RA)*hourPerRad, calDF[calDF$HA == transit,]$XYcorr, sprintf('%.1fh', (transit + df$RA)*hourPerRad), adj=0, col='red') }
+    }
     return( df )
 }
 #-------- Flag LST range
@@ -180,7 +192,7 @@ numSrc <- length(sourceList)
 #-------- Loop in frequency band
 for(band in seq(1, 7)){
     #-------- Today's IQUV
-    srcDF <- srcFreqCalibrator(FLDF, band)
+    srcDF <- srcFreqCalibrator(FLDF, band)  # source properties (I, Q, U, V, P, EVPA) at the band
     #-------- XY-LST plot
     plotDF <- plotLST(srcDF[srcDF$P - srcDF$eP > Pthresh12[band], ], band)
     pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
@@ -193,8 +205,8 @@ for(band in seq(1, 7)){
     srcDF <- srcDF[srcDF$P - srcDF$eP > Pthresh12[band],]  # filter by polarized flux
     srcDF <- srcDF[srcDF$DEC < ALMA_LAT + pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
-    srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0* pi / 180,]  # avoid zenith passage
-    srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle above EL limit (30 deg)
+    srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0/RADDEG,]  # avoid zenith passage
+    srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle [rad] above EL limit (30 deg)
     srcDF$LST7max <- srcDF$LST7min <- srcDF$LSTmax <- srcDF$LSTmin <- srcDF$HA7max <- srcDF$HA7min <- srcDF$HA12max <- srcDF$HA12min <- 0.0
     srcDF$png <- ''
     for(index in 1:nrow(srcDF)){
