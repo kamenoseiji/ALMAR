@@ -26,7 +26,7 @@ cos_phi <- cos(ALMA_LAT)
 sin_phi <- sin(ALMA_LAT)
 maxSinEL <- sin(86/RADDEG)
 minSinEL <- sin(30/RADDEG)
-sessionDuration <- 3.0/hourPerRad	# 3 hours in [rad]
+sessionDuration <- 1.0/hourPerRad	# at least 1 hour for session, in [rad]
 pointingDuration <- 0.1/hourPerRad	# 0.1 hourss in [rad]
 DateRange <- 60    # 60-day window
 #-------- # cos(hour angle) when it passes the given EL
@@ -108,21 +108,57 @@ srcFreqCalibrator <- function(DF, band){
 #-------- HA range over threshold
 HArange <- function(df, thresh12, thresh7, BPA){
     cos_dec <- cos(df$DEC); sin_dec <- sin(df$DEC)
-    df$HA12min <- df$HA7min <- -df$ELHA; df$HA12max <- df$HA7max <- df$ELHA - sessionDuration  # tentative HA range, to assure EL > 30 deg for sessionDuration (3 hours)
+    df$HA12min <- df$HA7min <- -df$ELHA
+    df$HA12max <- df$HA7max <- df$ELHA
+    #df$HA12max <- df$HA7max <- df$ELHA - sessionDuration  # tentative HA range, to assure EL > 30 deg for sessionDuration (3 hours)
     HApointer  <- which(names(srcDF) == 'HA12min')
     LSTpointer <- which(names(srcDF) == 'LSTmin')
-    if( df$HA12min > df$HA12max ){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # No valid HA and LST
     HA <- seq(-df$ELHA, df$ELHA + HAresolution, by=HAresolution)  # Hour angle above EL limit
     sinHA <- sin(HA); cosHA <- cos(HA)
     PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BPA   # Parallactic angle + BandPA
     calDF <- data.frame(HA=HA, PA=PA, XYcorr=df$U* cos(2.0*PA) - df$Q* sin(2.0*PA))
-    calDF12 <- calDF[abs(calDF$XYcorr) > thresh12,]
-    if(nrow(calDF12) < 1){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # Not available for 12m array
-    calDF7  <- calDF[abs(calDF$XYcorr) > thresh7,]
-    if(nrow(calDF7) < 1){ df[(HApointer+2):(HApointer+3)] <- df[(LSTpointer+2):(LSTpointer+3)] <- NA}   # Not available for 7m array
     HA_intercepts <- HA[which(diff(sign(calDF$XYcorr)) != 0)]     # hour angles of sign transition
     if(length(HA_intercepts) < 1){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # No zero-intercept
     XY_transit12 <- HA[which(diff(sign(abs(calDF$XYcorr) - thresh12)) != 0.0)]  # XYcorr straddles threshold
+    XY_transit7 <- HA[which(diff(sign(abs(calDF$XYcorr) - thresh7)) != 0.0)]  # XYcorr straddles threshold
+	plot((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, type='l', col='darkgreen', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', df$Src, band))
+	grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
+	abline(h=thresh12, lty=2, col='blue'); abline(h=-thresh12, lty=2, col='blue'); abline(h=thresh7, lty=2, col='red'); abline(h=-thresh7, lty=2, col='red'); abline(v=hourPerRad* (HA_intercepts + df$RA))
+    text((min(HA)+df$RA)*hourPerRad+0.1, thresh12, '12-m threshold', col='blue', pos=3); text((min(HA)+df$RA)*hourPerRad+0.1, thresh7, '7-m threshold', col='red', pos=3)
+    for(intercept in HA_intercepts){ text((intercept + df$RA)*hourPerRad, min(calDF$XYcorr), sprintf('%.1fh', (intercept + df$RA)*hourPerRad), pos=4, srt=90) }
+    calDF <- calDF[calDF$HA < max(HA_intercepts) - pointingDuration,]          # start time must be before the last intercept
+    HA_XY12 <- calDF[abs(calDF$XYcorr) > thresh12,]$HA - HAresolution* ceiling(pointingDuration/HAresolution)    # HA range for XY > thresh, 0.1 hour ahead
+    HA_XY7  <- calDF[abs(calDF$XYcorr) > thresh7,]$HA - HAresolution* ceiling(pointingDuration/HAresolution)     # HA range for XY > thresh, 0.1 hour ahead
+    calDF$et12 <- ifelse( length(HA_XY12) > 0, max(HA), NA)
+    calDF$et7  <- ifelse( length(HA_XY7)  > 0, max(HA), NA)
+    for(index in 1:nrow(calDF)){
+        calDF$et12[index] <- ifelse( calDF$HA[index] %in% HA_XY12, max(calDF$HA[index]+sessionDuration, min(HA_intercepts)),  max(calDF$HA[index]+sessionDuration, min(HA_XY12), min(HA_intercepts)))
+    }
+    #-------- Output 
+    df[2,] <- df[1,]
+    flatET12 <- which(diff(calDF$et12) < 0.5*HAresolution)
+    lineET12 <- which(diff(calDF$et12) >= 0.5*HAresolution)
+    if(length(lineET12) > 0){
+        df[2,]$A12min <- calDF$HA[min(lineET12)]
+        df[2,]$HA12max <- calDF$HA[max(lineET12)]
+    } else {
+        df <- df[-2,]
+    }
+    if(length(flatET12) > 0){
+        df[1,]$HA12min <- calDF$HA[min(flatET12)]
+        df[1,]$HA12max <- calDF$HA[max(flatET12)]
+    } else {
+        df <- df[-1,]
+    }
+    
+        
+
+    if(length(HA_XY7)  > 0){
+        for(index in 1:nrow(calDF)){
+            calDF$et7[index]  <- ifelse( calDF$HA[index] %in% HA_XY7 , max(calDF$HA[index]+sessionDuration, min(HA_intercepts)),  max(calDF$HA[index]+sessionDuration, min(HA_XY7 ), min(HA_intercepts)))
+        }
+    }
+
     df$HA12min <- max(df$HA12min, min(HA_intercepts) - sessionDuration, min(calDF12$HA) - sessionDuration)	 # Cover zero-crossing within 3 hours 
 	df$HA12max <- min(df$HA12max, max(HA_intercepts) - pointingDuration, max(calDF12$HA) - pointingDuration) # 
     df$LSTmin <- df$HA12min + df$RA 
@@ -225,7 +261,7 @@ for(band in seq(1, 7)){
     par(mar=c(4,8,3,3))
     LSTplot <- barplot(height=rep(NA, nrow(srcDF)), names=srcDF$Src, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('Polarization Calibrators at Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
     for(index in 1:nrow(LSTwindow)){
-        rect( hourPerRad*LSTwindow$LSTbegin[index], 0, hourPerRad*LSTwindow$LSTend[index], max(LSTplot)+1, col='lightgreen', border='transparent', alpha=0.25 )
+        rect( hourPerRad*LSTwindow$LSTbegin[index], 0, hourPerRad*LSTwindow$LSTend[index], max(LSTplot)+1, col='lightgreen', border='transparent')
         text_sd <- sprintf('LST=[%.1fh - %.1fh]', hourPerRad*abs(LSTwindow$LSTbegin[index]), hourPerRad*LSTwindow$LSTend[index])
         text(0.5*hourPerRad*(LSTwindow$LSTbegin[index] + LSTwindow$LSTend[index]), -0.5, text_sd, cex=2, col='darkgreen')
     }
