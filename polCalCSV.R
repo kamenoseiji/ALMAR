@@ -107,55 +107,104 @@ srcFreqCalibrator <- function(DF, band){
 }
 #-------- HA range over threshold
 HArange <- function(df, thresh12, thresh7, BPA){
+    #df$HA7st1  <- df$HA7st2  <- df$HA7et  <- numeric(1)
+    #df$HA12st1 <- df$HA12st2 <- df$HA12et <- numeric(1)
+    DF <- df    # for output
     cos_dec <- cos(df$DEC); sin_dec <- sin(df$DEC)
-    df$HA12min <- df$HA7min <- -df$ELHA
-    df$HA12max <- df$HA7max <- df$ELHA
-    #df$HA12max <- df$HA7max <- df$ELHA - sessionDuration  # tentative HA range, to assure EL > 30 deg for sessionDuration (3 hours)
-    HApointer  <- which(names(srcDF) == 'HA12min')
-    LSTpointer <- which(names(srcDF) == 'LSTmin')
+    HApointer  <- which(names(srcDF) == 'HA7et')
+    LSTpointer <- which(names(srcDF) == 'LST7et')
     HA <- seq(-df$ELHA, df$ELHA + HAresolution, by=HAresolution)  # Hour angle above EL limit
     sinHA <- sin(HA); cosHA <- cos(HA)
     PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BPA   # Parallactic angle + BandPA
-    calDF <- data.frame(HA=HA, PA=PA, XYcorr=df$U* cos(2.0*PA) - df$Q* sin(2.0*PA))
+    calDF <- data.frame(HA=HA, PA=PA, XYcorr=df$U* cos(2.0*PA) - df$Q* sin(2.0*PA), et12=NA)
     HA_intercepts <- HA[which(diff(sign(calDF$XYcorr)) != 0)]     # hour angles of sign transition
-    if(length(HA_intercepts) < 1){ df[HApointer:(HApointer+3)] <- df[LSTpointer:(LSTpointer+3)] <- NA; return(df)}   # No zero-intercept
+    HA_overthresh12 <- calDF[abs(calDF$XYcorr) > thresh12,]$HA
+    calDF <- calDF[calDF$HA < max(HA_intercepts) - pointingDuration,]          # start time must be before the last intercept
+    for(index in 1:nrow(calDF)){
+        if(calDF[index,]$HA %in% HA_overthresh12){
+            calDF[index,]$et12 <- min(HA_intercepts[which(HA_intercepts > calDF[index,]$HA)])
+        } else if(calDF[index,]$HA < max(HA_intercepts)){
+            calDF[index,]$et12 <- max(min(HA_intercepts[which(HA_intercepts > calDF[index,]$HA)]), min(HA_overthresh12[which(HA_overthresh12 > calDF[index,]$HA)]))
+        }
+    }
+    calDF <- na.omit(calDF)
+    et12List <- unique(calDF$et12)
+    for(index in seq_along(et12List)){
+        DF[index,] <- DF[1,]
+        DF$HA12st1[index] <- min(calDF$HA[which(calDF$et12 == et12List[index])])
+        DF$HA12st2[index] <- max(calDF$HA[which(calDF$et12 == et12List[index])])
+        DF$HA12et[index]  <- et12List[index]
+    }
+
+
+
+
+    if(length(HA_intercepts) < 1){ df[HApointer:(HApointer+5)] <- df[LSTpointer:(LSTpointer+5)] <- NA; return(df)}   # No zero-intercept
     XY_transit12 <- HA[which(diff(sign(abs(calDF$XYcorr) - thresh12)) != 0.0)]  # XYcorr straddles threshold
     XY_transit7 <- HA[which(diff(sign(abs(calDF$XYcorr) - thresh7)) != 0.0)]  # XYcorr straddles threshold
+    if(length(XY_transit12) < 1){ df[HApointer:(HApointer+5)] <- df[LSTpointer:(LSTpointer+5)] <- NA; return(df)}   # No XY > thresh
+
 	plot((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, type='l', col='darkgreen', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', df$Src, band))
 	grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
 	abline(h=thresh12, lty=2, col='blue'); abline(h=-thresh12, lty=2, col='blue'); abline(h=thresh7, lty=2, col='red'); abline(h=-thresh7, lty=2, col='red'); abline(v=hourPerRad* (HA_intercepts + df$RA))
     text((min(HA)+df$RA)*hourPerRad+0.1, thresh12, '12-m threshold', col='blue', pos=3); text((min(HA)+df$RA)*hourPerRad+0.1, thresh7, '7-m threshold', col='red', pos=3)
     for(intercept in HA_intercepts){ text((intercept + df$RA)*hourPerRad, min(calDF$XYcorr), sprintf('%.1fh', (intercept + df$RA)*hourPerRad), pos=4, srt=90) }
-    calDF <- calDF[calDF$HA < max(HA_intercepts) - pointingDuration,]          # start time must be before the last intercept
+
+
+
+    #-------- for 12m threshold
     HA_XY12 <- calDF[abs(calDF$XYcorr) > thresh12,]$HA - HAresolution* ceiling(pointingDuration/HAresolution)    # HA range for XY > thresh, 0.1 hour ahead
-    HA_XY7  <- calDF[abs(calDF$XYcorr) > thresh7,]$HA - HAresolution* ceiling(pointingDuration/HAresolution)     # HA range for XY > thresh, 0.1 hour ahead
-    calDF$et12 <- ifelse( length(HA_XY12) > 0, max(HA), NA)
-    calDF$et7  <- ifelse( length(HA_XY7)  > 0, max(HA), NA)
+    calDF$et12 <- ifelse(length(HA_XY12) > 0, max(HA), NA)
     for(index in 1:nrow(calDF)){
         calDF$et12[index] <- ifelse( calDF$HA[index] %in% HA_XY12, max(calDF$HA[index]+sessionDuration, min(HA_intercepts)),  max(calDF$HA[index]+sessionDuration, min(HA_XY12), min(HA_intercepts)))
     }
-    #-------- Output 
-    df[2,] <- df[1,]
     flatET12 <- which(diff(calDF$et12) < 0.5*HAresolution)
     lineET12 <- which(diff(calDF$et12) >= 0.5*HAresolution)
-    if(length(lineET12) > 0){
-        df[2,]$A12min <- calDF$HA[min(lineET12)]
-        df[2,]$HA12max <- calDF$HA[max(lineET12)]
-    } else {
-        df <- df[-2,]
-    }
+    numWindow <- sign(length(flatET12)) + sign(length(lineET12))
+    for(row_index in 2:numWindow){ DF[row_index,] <- DF[1,] }
+    row_index <- 1
     if(length(flatET12) > 0){
-        df[1,]$HA12min <- calDF$HA[min(flatET12)]
-        df[1,]$HA12max <- calDF$HA[max(flatET12)]
-    } else {
-        df <- df[-1,]
+        DF[row_index,]$HA12st1 <- calDF$HA[min(flatET12)]
+        DF[row_index,]$HA12st2 <- calDF$HA[max(flatET12)]
+        DF[row_index,]$HA12et  <- calDF$et12[max(flatET12)]
+        row_index <- row_index + 1
     }
-    
-        
+    if(length(lineET12) > 0){
+        DF[row_index,]$HA12st1 <- calDF$HA[min(lineET12)]
+        DF[row_index,]$HA12st2 <- calDF$HA[max(lineET12)]
+        DF[row_index,]$HA12et  <- calDF$et12[max(lineET12)]
+    }
+    DF$LST12st1 <- DF$HA12st1 + DF$RA
+    DF$LST12st2 <- DF$HA12st2 + DF$RA
+    DF$LST12et  <- DF$HA12et  + DF$RA
+    for(row_index in 1:numWindow){
+	    lines(c(DF[row_index,]$LST12st1, DF[row_index,]$LST12st2)*hourPerRad, 0.005*c(row_index-1, row_index-1), lwd=4, col='blue')
+	    lines(c(DF[row_index,]$LST12st2, DF[row_index,]$LST12et)*hourPerRad,  0.005*c(row_index-1, row_index-1), lwd=2, lty=2, col='blue')
+        text(DF[row_index,]$LST12st1*hourPerRad, 0.01*row_index, sprintf('%.1fh', DF[row_index,]$LST12st1*hourPerRad), pos=1, col='blue')
+        text(DF[row_index,]$LST12st2*hourPerRad, 0.0, sprintf('%.1fh', DF[row_index,]$LST12st2*hourPerRad), pos=1, col='blue')
+        text(DF[row_index,]$LST12et*hourPerRad, 0.0,  sprintf('%.1fh', DF[row_index,]$LST12et*hourPerRad), pos=1, col='blue')
+    }
 
-    if(length(HA_XY7)  > 0){
+
+
+    #-------- for 7m threshold
+    if(length(XY_transit7)  > 0){
+        HA_XY7 <- calDF[abs(calDF$XYcorr) > thresh7,]$HA - HAresolution* ceiling(pointingDuration/HAresolution)    # HA range for XY > thresh, 0.1 hour ahead
+        calDF$et7 <- ifelse( length(HA_XY7) > 0, max(HA), NA)
         for(index in 1:nrow(calDF)){
-            calDF$et7[index]  <- ifelse( calDF$HA[index] %in% HA_XY7 , max(calDF$HA[index]+sessionDuration, min(HA_intercepts)),  max(calDF$HA[index]+sessionDuration, min(HA_XY7 ), min(HA_intercepts)))
+            calDF$et7[index]  <- ifelse( calDF$HA[index] %in% HA_XY7 , max(calDF$HA[index]+sessionDuration, min(HA_intercepts)),  max(calDF$HA[index]+sessionDuration, min(HA_XY7), min(HA_intercepts)))
+        }
+        flatET7 <- which(diff(calDF$et7) < 0.5*HAresolution)
+        lineET7 <- which(diff(calDF$et7) >= 0.5*HAresolution)
+        if(length(flatET7) > 0){
+            df$HA7st1 <- calDF$HA[min(flatET7)]
+            df$HA7st2 <- calDF$HA[max(flatET7)]
+            df$HA7et  <- calDF$et7[min(flatET7)]
+        }
+        if(length(lineET7) > 0){
+            df$HA7st1 <- append(df$HA7st1, calDF$HA[min(lineET7)])
+            df$HA7st2 <- append(df$HA7st1, calDF$HA[max(lineET7)])
+            df$HA7et  <- append(df$HA7st1, calDF$et7[min(lineET7)])
         }
     }
 
@@ -243,7 +292,8 @@ for(band in seq(1, 7)){
     srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0/RADDEG,]  # avoid zenith passage
     srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle [rad] above EL limit (30 deg)
-    srcDF$LST7max <- srcDF$LST7min <- srcDF$LSTmax <- srcDF$LSTmin <- srcDF$HA7max <- srcDF$HA7min <- srcDF$HA12max <- srcDF$HA12min <- 0.0
+    srcDF$HA12st1 <- srcDF$HA12st2 <- srcDF$HA12et <- srcDF$HA7st1 <- srcDF$HA7st2 <- srcDF$HA7et <- 0.0
+    srcDF$LST12st1 <- srcDF$LST12st2 <- srcDF$LST12et <- srcDF$LST7st1 <- srcDF$LST7st2 <- srcDF$LST7et <- 0.0
     srcDF$png <- ''
     for(index in 1:nrow(srcDF)){
 		pngFile <- sprintf('%s-Band%d-PA.png', srcDF$Src[index], band)
