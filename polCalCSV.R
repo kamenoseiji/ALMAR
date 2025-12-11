@@ -108,13 +108,16 @@ srcFreqCalibrator <- function(DF, band){
 #-------- HA range over threshold
 HArange <- function(df, thresh, BPA){
     cos_dec <- cos(df$DEC); sin_dec <- sin(df$DEC)
-    DF <- data.frame(matrix(rep(NA, 6), nrow=1)); colnames(DF) <- c('HAst1', 'HAst2', 'HAet', 'LSTst1', 'LSTst2', 'LSTet')
+    DF <- data.frame(matrix(rep(NA, 10), nrow=1)); colnames(DF) <- c('Src', 'I', 'P', 'EVPA', 'HAst1', 'HAst2', 'HAet', 'LSTst1', 'LSTst2', 'LSTet')
+    DF$Src <- df$Src; DF$I <- df$I; DF$P <- df$P; DF$EVPA <- df$EVPA
     HA <- seq(-df$ELHA, df$ELHA + HAresolution, by=HAresolution)  # Hour angle above EL limit
     sinHA <- sin(HA); cosHA <- cos(HA)
     PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BPA   # Parallactic angle + BandPA
     calDF <- data.frame(HA=HA, PA=PA, XYcorr=df$U* cos(2.0*PA) - df$Q* sin(2.0*PA), et=NA)
     HA_intercepts <- HA[which(diff(sign(calDF$XYcorr)) != 0)]     # hour angles of sign transition
+    if(length(HA_intercepts) < 1){ return(na.omit(DF)) }
     HA_XY <- calDF[abs(calDF$XYcorr) > thresh,]$HA
+    if(length(HA_XY) < 1){ return(na.omit(DF)) }
     #-------- Plot XY vs LST
 	plot((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, type='l', col='darkgreen', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d', df$Src, band))
 	grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
@@ -150,26 +153,27 @@ HArange <- function(df, thresh, BPA){
     DF$LSTet  <- DF$HAet  + df$RA
     for(row_index in 1:numWindow){
 	    lines(c(DF[row_index,]$LSTst1, DF[row_index,]$LSTst2)*hourPerRad, 0.005*c(row_index-1, row_index-1), lwd=4, col='blue')
-	    lines(c(DF[row_index,]$LSTst2, DF[row_index,]$LSTet)*hourPerRad,  0.005*c(row_index-1, row_index-1), lwd=2, lty=2, col='blue')
+	    lines(c(DF[row_index,]$LSTst2, DF[row_index,]$LSTet)*hourPerRad,  0.005*c(row_index-1, row_index-1), lwd=0.5, col='blue')
+	    lines(c(DF[row_index,]$LSTet, DF[row_index,]$LSTet + 0.25)*hourPerRad,  0.005*c(row_index-1, row_index-1), lwd=2, lty=2, col='blue')
 	    points(DF[row_index,]$LSTet*hourPerRad, 0.005*(row_index-1), pch=18, cex=2, col='black')
         text(DF[row_index,]$LSTst1*hourPerRad, 0.005*(row_index-1), sprintf('%.1fh', DF[row_index,]$LSTst1*hourPerRad), offset=1, pos=3, col='blue', srt=90)
         text(DF[row_index,]$LSTst2*hourPerRad, 0.005*(row_index-1), sprintf('%.1fh', DF[row_index,]$LSTst2*hourPerRad), offset=1, pos=1, col='blue', srt=-90)
         text(DF[row_index,]$LSTet*hourPerRad, 0.005*(row_index-1),  sprintf('%.1fh', DF[row_index,]$LSTet*hourPerRad), offset=1, pos=1, col='blue', srt=-90)
     }
-    return( DF )
+    return( DF[,c('Src', 'I', 'P', 'EVPA', 'LSTst1', 'LSTst2', 'LSTet')] )
 }
 #-------- Flag LST range
 LSTfrag <- function(df){
     LSTrange <- pi* seq(-1, 1440, by=1)/720.0  # 1-min unit, in [rad]
     LSTfrag <- rep(1, length(LSTrange))
-    df <- df[!is.na(df$LST7min),]
-    df$LST7min <- df$LST7min %% (2*pi)
-    df$LST7max <- df$LST7max %% (2*pi)
+    df <- df[!is.na(df$LSTet),]
+    df$LSTst1 <- df$LSTst1 %% (2*pi)
+    df$LSTst2 <- df$LSTst2 %% (2*pi)
     for(index in 1:nrow(df)){
-        if(df$LST7min[index] < df$LST7max[index]){
-            LSTindex <- which((LSTrange > df$LST7min[index]) & (LSTrange < df$LST7max[index]))
+        if(df$LSTst1[index] < df$LSTst2[index]){
+            LSTindex <- which((LSTrange > df$LSTst1[index]) & (LSTrange < df$LSTst2[index]))
         } else {
-            LSTindex <- which((LSTrange > df$LST7min[index]) | (LSTrange < df$LST7max[index]))
+            LSTindex <- which((LSTrange > df$LSTst1[index]) | (LSTrange < df$LSTst2[index]))
         }
         LSTfrag[LSTindex] <- 0
     }
@@ -201,6 +205,8 @@ numSrc <- length(sourceList)
 for(band in seq(1, 7)){
     #-------- Today's IQUV
     srcDF <- srcFreqCalibrator(FLDF, band)  # source properties (I, Q, U, V, P, EVPA) at the band
+    LST12DF <- na.omit(data.frame(matrix(rep(NA, 7), nrow=1))); names(LST12DF) <- c('Src', 'I', 'P', 'EVPA', 'LSTst1', 'LSTst2', 'LSTet') 
+    LST7DF  <- na.omit(data.frame(matrix(rep(NA, 7), nrow=1))); names(LST7DF) <- c('Src', 'I', 'P', 'EVPA', 'LSTst1', 'LSTst2', 'LSTet') 
     #-------- XY-LST plot
     plotDF <- plotLST(srcDF[srcDF$P - srcDF$eP > Pthresh12[band], ], band)
     pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
@@ -215,34 +221,40 @@ for(band in seq(1, 7)){
     srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0/RADDEG,]  # avoid zenith passage
     srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle [rad] above EL limit (30 deg)
-    #srcDF$HA12st1 <- srcDF$HA12st2 <- srcDF$HA12et <- srcDF$HA7st1 <- srcDF$HA7st2 <- srcDF$HA7et <- 0.0
-    #srcDF$LST12st1 <- srcDF$LST12st2 <- srcDF$LST12et <- srcDF$LST7st1 <- srcDF$LST7st2 <- srcDF$LST7et <- 0.0
-    srcDF$png <- ''
     for(index in 1:nrow(srcDF)){
-		pngFile <- sprintf('%s-Band%d-PA.png', srcDF$Src[index], band)
+		pngFile <- sprintf('%s-Band%d-PA-12m.png', srcDF$Src[index], band)
 		png(pngFile, width=1024, height=768)
-        srcDF[index,] <- HArange(srcDF[index,], Pthresh12[band], Pthresh7[band], BandPA[band])
+        LST12DF <- rbind(LST12DF, HArange(srcDF[index,], Pthresh12[band], BandPA[band]))
 		dev.off()
-		srcDF$png[index] <- pngFile
+		pngFile <- sprintf('%s-Band%d-PA-7m.png', srcDF$Src[index], band)
+		png(pngFile, width=1024, height=768)
+        LST7DF <- rbind(LST7DF, HArange(srcDF[index,], Pthresh7[band], BandPA[band]))
+		dev.off()
     }
-    srcDF <- srcDF[!is.na(srcDF$HA12min),]
-    LSTwindow <- LSTfrag(srcDF)
-    cat(sprintf('Band %d : %d sources\n', band, nrow(srcDF)))
-    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
-	pngFile <- sprintf('Band%d-LST.png', band)
+    LSTwindow12 <- LSTfrag(LST12DF)
+    LSTwindow7  <- LSTfrag(LST7DF)
+    cat(sprintf('Band %d 12m array: %d sources\n', band, length(unique(LST12DF$Src))))
+    write.csv(LST12DF, sprintf('PolCal12mBand%d.csv', band), row.names=FALSE)
+    cat(sprintf('Band %d  7m array: %d sources\n', band, length(unique(LST7DF$Src))))
+    write.csv(LST7DF, sprintf('PolCal7mBand%d.csv', band), row.names=FALSE)
+    #-------- Plot 
+	pngFile <- sprintf('Band%d-LST-12m.png', band)
     png(pngFile, width=1536, height=1024)
     par(mar=c(4,8,3,3))
-    LSTplot <- barplot(height=rep(NA, nrow(srcDF)), names=srcDF$Src, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('Polarization Calibrators at Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
+
+    LSTplot <- barplot(height=rep(NA, nrow(srcDF)), names=srcDF$Src, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('Polarization Calibrators for 12m array at Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
     for(index in 1:nrow(LSTwindow)){
-        rect( hourPerRad*LSTwindow$LSTbegin[index], 0, hourPerRad*LSTwindow$LSTend[index], max(LSTplot)+1, col='lightgreen', border='transparent')
-        text_sd <- sprintf('LST=[%.1fh - %.1fh]', hourPerRad*abs(LSTwindow$LSTbegin[index]), hourPerRad*LSTwindow$LSTend[index])
-        text(0.5*hourPerRad*(LSTwindow$LSTbegin[index] + LSTwindow$LSTend[index]), -0.5, text_sd, cex=2, col='darkgreen')
+        rect( hourPerRad*LSTwindow12$LSTbegin[index], 0, hourPerRad*LSTwindow12$LSTend[index], max(LSTplot)+1, col='lightgreen', border='transparent')
+        text_sd <- sprintf('LST=[%.1fh - %.1fh]', hourPerRad*abs(LSTwindow12$LSTbegin[index]), hourPerRad*LSTwindow12$LSTend[index])
+        text(0.5*hourPerRad*(LSTwindow12$LSTbegin[index] + LSTwindow12$LSTend[index]), -0.5, text_sd, cex=2, col='darkgreen')
     }
     grid(nx=24, ny=0, lwd=0.5, lty=1, col='gray')
-    for(index in 1:nrow(srcDF)){
-        segColor <- ifelse(srcDF$P[index] - srcDF$eP[index] > Pthresh7[band], 'red', 'blue')
-        segWidth <- min(c(100*srcDF$P[index], 20))
+    uniqueCalibrators <- unique(LST12DF$Src)
+    for(calibrator in uniqueCalibrators){
+        calDF <- LST12DF[LST7DF$Src == calibrator,]
+        segWidth <- 100*min(mean(calDF$P), 20)
         abline(h=LSTplot[index], col='black', lwd=0.5)
+
         arrows(hourPerRad* srcDF$LSTmin[index], LSTplot[index], hourPerRad* srcDF$LSTmax[index], LSTplot[index], length=0, lwd=segWidth, col='blue')
         if( srcDF$LSTmin[index] < 0.0){
             arrows(hourPerRad* srcDF$LSTmin[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='blue')
@@ -268,4 +280,5 @@ for(band in seq(1, 7)){
         }
     }
     dev.off()
+    }
 }
