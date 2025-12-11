@@ -123,40 +123,20 @@ HArange <- function(df, thresh, BPA){
     calDF <- calDF[calDF$HA < max(HA_intercepts) - pointingDuration,]          # start time must be before the last intercept
     #-------- HA range for |XY| > thresh
     indexRange <- which(abs(calDF$XYcorr) > thresh)
-    for(intercept in HA_intercepts){
+    for(intercept in sort(HA_intercepts, TRUE)){
         index <- which(calDF$HA[indexRange] < intercept - pointingDuration)
         calDF$et[indexRange[index]] <- intercept 
     }
     #-------- HA range for |XY| <= thresh12
     indexRange <- which(abs(calDF$XYcorr) <= thresh)
-    breakPoints <- c(0, which(diff(indexRange) > 1), length(indexRange))
-    windowList <- list()
-    for(i in 1:(length(breakPoints)-1)){ windowList[[i]] <- indexRange[(breakPoints[i]+1):breakPoints[i+1]]}
-    for(i in seq_along(windowList)){
-        indexList <- windowList[[i]]
-        if( max(calDF$HA[indexList]) < max(HA_intercepts) - pointingDuration ){
-        }
-
-
-        if(index == length(breakPoints)){
-            indexList <- indexRange[breakPoints[index]]:max(indexRange)
-            calDF$et[indexList] <- HA_XY[which(HA_XY > calDF$HA[max(indexList)])]
-        } else {
-            indexList <- indexRange[breakPoints[index]]:(indexRange[breakPoints[index+1]]-1)
-        ]
-        indexList <- ifelse(index == length(breakPoints), seq(indexRange[breakPoints[index]],max(indexRange)), seq(indexRange[breakPoints[index]],indexRange[breakPoints[index+1]]-1))
-    }
-        
-        calDF$et[indexRange[breakPoints[index]]:indexRange[breakPoints[index]]] <- 
-
-
-    for(intercept in HA_intercepts){
-        index_after_intercept <- which(HA_XY > intercept)
-        if(length(index_after_intercept) > 0){
-            index <- which(calDF$HA[indexRange] < intercept - pointingDuration)
-            calDF$et[indexRange[index]] <- HA_XY[min(index_after_intercept)]
+    for(index in indexRange){
+        threshCondition    <- which(HA_XY > calDF[index,]$HA)
+        interceptCondition <- which(HA_intercepts > calDF[index,]$HA)
+        if( length(threshCondition)* length(interceptCondition) > 0){
+            calDF[index,]$et <- max(HA_XY[min(threshCondition)], HA_intercepts[min(interceptCondition)])
         }
     }
+    calDF <- na.omit(calDF)
     #-------- Summarize LST range into DF
     etList <- unique(calDF$et); numWindow <- length(etList)
     for(index in seq_along(etList)){
@@ -168,12 +148,13 @@ HArange <- function(df, thresh, BPA){
     DF$LSTst1 <- DF$HAst1 + df$RA
     DF$LSTst2 <- DF$HAst2 + df$RA
     DF$LSTet  <- DF$HAet  + df$RA
-    for(row_index in 1:length(et12List)){
+    for(row_index in 1:numWindow){
 	    lines(c(DF[row_index,]$LSTst1, DF[row_index,]$LSTst2)*hourPerRad, 0.005*c(row_index-1, row_index-1), lwd=4, col='blue')
 	    lines(c(DF[row_index,]$LSTst2, DF[row_index,]$LSTet)*hourPerRad,  0.005*c(row_index-1, row_index-1), lwd=2, lty=2, col='blue')
-        text(DF[row_index,]$LSTst1*hourPerRad, 0.005*row_index, sprintf('%.1fh', DF[row_index,]$LSTst1*hourPerRad), pos=1, col='blue', srt=45)
-        text(DF[row_index,]$LSTst2*hourPerRad, 0.005*row_index, sprintf('%.1fh', DF[row_index,]$LSTst2*hourPerRad), pos=1, col='blue', srt=45)
-        text(DF[row_index,]$LSTet*hourPerRad, 0.005*row_index,  sprintf('%.1fh', DF[row_index,]$LSTet*hourPerRad), pos=1, col='blue', srt=45)
+	    points(DF[row_index,]$LSTet*hourPerRad, 0.005*(row_index-1), pch=18, cex=2, col='black')
+        text(DF[row_index,]$LSTst1*hourPerRad, 0.005*(row_index-1), sprintf('%.1fh', DF[row_index,]$LSTst1*hourPerRad), offset=1, pos=3, col='blue', srt=90)
+        text(DF[row_index,]$LSTst2*hourPerRad, 0.005*(row_index-1), sprintf('%.1fh', DF[row_index,]$LSTst2*hourPerRad), offset=1, pos=1, col='blue', srt=-90)
+        text(DF[row_index,]$LSTet*hourPerRad, 0.005*(row_index-1),  sprintf('%.1fh', DF[row_index,]$LSTet*hourPerRad), offset=1, pos=1, col='blue', srt=-90)
     }
     return( DF )
 }
@@ -234,8 +215,8 @@ for(band in seq(1, 7)){
     srcDF <- srcDF[srcDF$DEC > ALMA_LAT - pi/3,]  # max EL > 30 deg
     srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0/RADDEG,]  # avoid zenith passage
     srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle [rad] above EL limit (30 deg)
-    srcDF$HA12st1 <- srcDF$HA12st2 <- srcDF$HA12et <- srcDF$HA7st1 <- srcDF$HA7st2 <- srcDF$HA7et <- 0.0
-    srcDF$LST12st1 <- srcDF$LST12st2 <- srcDF$LST12et <- srcDF$LST7st1 <- srcDF$LST7st2 <- srcDF$LST7et <- 0.0
+    #srcDF$HA12st1 <- srcDF$HA12st2 <- srcDF$HA12et <- srcDF$HA7st1 <- srcDF$HA7st2 <- srcDF$HA7et <- 0.0
+    #srcDF$LST12st1 <- srcDF$LST12st2 <- srcDF$LST12et <- srcDF$LST7st1 <- srcDF$LST7st2 <- srcDF$LST7et <- 0.0
     srcDF$png <- ''
     for(index in 1:nrow(srcDF)){
 		pngFile <- sprintf('%s-Band%d-PA.png', srcDF$Src[index], band)
