@@ -183,7 +183,7 @@ LSTfrag <- function(df){
 #-------- Load Flux.Rdata from web
 #FluxDataURL <- "https://www.alma.cl/~skameno/AMAPOLA/"
 #load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
-load("Flux.Rdata")     # Data frame of FLDF
+#load("Flux.Rdata")     # Data frame of FLDF
 FLDF <- FLDF[as.Date(FLDF$Date) > Sys.Date() - DateRange,]  # Data frame within DateRange
 #-------- Filter quasars
 FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]    # only quasars
@@ -238,47 +238,46 @@ for(band in seq(1, 7)){
     cat(sprintf('Band %d  7m array: %d sources\n', band, length(unique(LST7DF$Src))))
     write.csv(LST7DF, sprintf('PolCal7mBand%d.csv', band), row.names=FALSE)
     #-------- Plot 
+    uniqueCalibrators <- unique(LST12DF$Src)
 	pngFile <- sprintf('Band%d-LST-12m.png', band)
     png(pngFile, width=1536, height=1024)
     par(mar=c(4,8,3,3))
-
-    LSTplot <- barplot(height=rep(NA, nrow(srcDF)), names=srcDF$Src, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('Polarization Calibrators for 12m array at Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
-    for(index in 1:nrow(LSTwindow)){
-        rect( hourPerRad*LSTwindow12$LSTbegin[index], 0, hourPerRad*LSTwindow12$LSTend[index], max(LSTplot)+1, col='lightgreen', border='transparent')
-        text_sd <- sprintf('LST=[%.1fh - %.1fh]', hourPerRad*abs(LSTwindow12$LSTbegin[index]), hourPerRad*LSTwindow12$LSTend[index])
-        text(0.5*hourPerRad*(LSTwindow12$LSTbegin[index] + LSTwindow12$LSTend[index]), -0.5, text_sd, cex=2, col='darkgreen')
+    LSTplot <- barplot(height=rep(NA, length(uniqueCalibrators)), names=uniqueCalibrators, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('Polarization Calibrators for 12m array at Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
+    for(index in 1:nrow(LSTwindow7)){
+        rect( hourPerRad*LSTwindow7$LSTbegin[index], 0, hourPerRad*LSTwindow7$LSTend[index], max(LSTplot)+1, col='lightgreen', border='transparent')
+        text_sd <- sprintf('LST=[%.1fh - %.1fh]', hourPerRad*abs(LSTwindow7$LSTbegin[index]), hourPerRad*LSTwindow7$LSTend[index])
+        text(0.5*hourPerRad*(LSTwindow7$LSTbegin[index] + LSTwindow7$LSTend[index]), -0.5, text_sd, cex=2, col='darkgreen')
     }
     grid(nx=24, ny=0, lwd=0.5, lty=1, col='gray')
-    uniqueCalibrators <- unique(LST12DF$Src)
-    for(calibrator in uniqueCalibrators){
-        calDF <- LST12DF[LST7DF$Src == calibrator,]
-        segWidth <- 100*min(mean(calDF$P), 20)
+    #for(calibrator in uniqueCalibrators){
+    for(index in seq_along(uniqueCalibrators)){
+        calibrator <- uniqueCalibrators[index]
+        calDF <- LST12DF[LST12DF$Src == calibrator,]
+        segWidth <- 100*min(calDF$P[1], 20)
         abline(h=LSTplot[index], col='black', lwd=0.5)
-
-        arrows(hourPerRad* srcDF$LSTmin[index], LSTplot[index], hourPerRad* srcDF$LSTmax[index], LSTplot[index], length=0, lwd=segWidth, col='blue')
-        if( srcDF$LSTmin[index] < 0.0){
-            arrows(hourPerRad* srcDF$LSTmin[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='blue')
-            text(hourPerRad*srcDF$LSTmin[index] + 24.0, LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmin[index] + 24.0), pos=2) 
+        arrows(hourPerRad* min(calDF$LSTst1), LSTplot[index], hourPerRad* max(calDF$LSTst2), LSTplot[index], length=0, lwd=segWidth, col='blue')
+        if( min(calDF$LSTst1) < 0.0){
+            arrows(hourPerRad* min(calDF$LSTst1) + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='blue')
+            text(hourPerRad*min(calDF$LSTst1) + 24.0, LSTplot[index], sprintf('%.1f', hourPerRad*min(calDF$LSTst1) + 24.0), pos=2) 
         } else {
-            text(hourPerRad*srcDF$LSTmin[index], LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmin[index]), pos=2) 
+            text(hourPerRad*min(calDF$LSTst1), LSTplot[index], sprintf('%.1f', hourPerRad*min(calDF$LSTst1)), pos=2) 
         }
-        if( srcDF$LSTmax[index] > 2.0*pi){
-            arrows(0.0, LSTplot[index], hourPerRad* srcDF$LSTmax[index] - 24.0, LSTplot[index], length=0, lwd=segWidth, col='blue')
-            text(hourPerRad*srcDF$LSTmax[index] - 24.0, LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmax[index] - 24.0), pos=4) 
+        if( max(calDF$LSTst2) > 2.0*pi){
+            arrows(0.0, LSTplot[index], hourPerRad* max(calDF$LSTst2) - 24.0, LSTplot[index], length=0, lwd=segWidth, col='blue')
+            text(hourPerRad*max(calDF$LSTst2) - 24.0, LSTplot[index], sprintf('%.1f', hourPerRad*max(calDF$LSTst2) - 24.0), pos=4) 
         } else {
-            text(hourPerRad*srcDF$LSTmax[index], LSTplot[index], sprintf('%.1f', hourPerRad*srcDF$LSTmax[index]), pos=4) 
+            text(hourPerRad*max(calDF$LSTst2), LSTplot[index], sprintf('%.1f', hourPerRad*max(calDF$LSTst2)), pos=4) 
         }
         legend('right',  legend=c('12-m or 7-m Array','Only 12-m Array','7-m Array Window'), col=c('red','blue', 'lightgreen'), lty=1, lwd=c(2,2,8))
-        if( !is.na(srcDF$LST7min[index])){             # Usable for 7m
-            arrows(hourPerRad* srcDF$LST7min[index], LSTplot[index], hourPerRad* srcDF$LST7max[index], LSTplot[index], length=0, lwd=segWidth, col='red')
-            if( srcDF$LST7min[index] < 0.0){
-                arrows(hourPerRad* srcDF$LST7min[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
-            }
-            if( srcDF$LST7max[index] > 2.0* pi){
-                arrows(0.0, LSTplot[index], hourPerRad* srcDF$LST7max[index] - 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
-            }
-        }
+        #if( !is.na(srcDF$LST7min[index])){             # Usable for 7m
+        #    arrows(hourPerRad* srcDF$LST7min[index], LSTplot[index], hourPerRad* srcDF$LST7max[index], LSTplot[index], length=0, lwd=segWidth, col='red')
+        #    if( srcDF$LST7min[index] < 0.0){
+        #        arrows(hourPerRad* srcDF$LST7min[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
+        #    }
+        #    if( srcDF$LST7max[index] > 2.0* pi){
+        #        arrows(0.0, LSTplot[index], hourPerRad* srcDF$LST7max[index] - 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
+        #    }
+        #}
     }
     dev.off()
-    }
 }
