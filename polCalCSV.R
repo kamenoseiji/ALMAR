@@ -183,7 +183,7 @@ LSTfrag <- function(df){
 #-------- Load Flux.Rdata from web
 #FluxDataURL <- "https://www.alma.cl/~skameno/AMAPOLA/"
 #load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
-#load("Flux.Rdata")     # Data frame of FLDF
+load("Flux.Rdata")     # Data frame of FLDF
 FLDF <- FLDF[as.Date(FLDF$Date) > Sys.Date() - DateRange,]  # Data frame within DateRange
 #-------- Filter quasars
 FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]    # only quasars
@@ -239,10 +239,10 @@ for(band in seq(1, 7)){
     write.csv(LST7DF, sprintf('PolCal7mBand%d.csv', band), row.names=FALSE)
     #-------- Plot 
     uniqueCalibrators <- unique(LST12DF$Src)
-	pngFile <- sprintf('Band%d-LST-12m.png', band)
+	pngFile <- sprintf('Band%d-LST.png', band)
     png(pngFile, width=1536, height=1024)
     par(mar=c(4,8,3,3))
-    LSTplot <- barplot(height=rep(NA, length(uniqueCalibrators)), names=uniqueCalibrators, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('Polarization Calibrators for 12m array at Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
+    LSTplot <- barplot(height=rep(NA, length(uniqueCalibrators)), names=uniqueCalibrators, horiz=TRUE, las=1, xlim=c(0,24), xlab='LST to start [h]', main=sprintf('LST windows to start a polarization session in Band %d as of %s', band, Sys.Date()), xaxp=c(0, 24, 24))
     for(index in 1:nrow(LSTwindow7)){
         rect( hourPerRad*LSTwindow7$LSTbegin[index], 0, hourPerRad*LSTwindow7$LSTend[index], max(LSTplot)+1, col='lightgreen', border='transparent')
         text_sd <- sprintf('LST=[%.1fh - %.1fh]', hourPerRad*abs(LSTwindow7$LSTbegin[index]), hourPerRad*LSTwindow7$LSTend[index])
@@ -253,7 +253,7 @@ for(band in seq(1, 7)){
     for(index in seq_along(uniqueCalibrators)){
         calibrator <- uniqueCalibrators[index]
         calDF <- LST12DF[LST12DF$Src == calibrator,]
-        segWidth <- 100*min(calDF$P[1], 20)
+        segWidth <- max(50*calDF$P[1], 15)
         abline(h=LSTplot[index], col='black', lwd=0.5)
         arrows(hourPerRad* min(calDF$LSTst1), LSTplot[index], hourPerRad* max(calDF$LSTst2), LSTplot[index], length=0, lwd=segWidth, col='blue')
         if( min(calDF$LSTst1) < 0.0){
@@ -269,15 +269,17 @@ for(band in seq(1, 7)){
             text(hourPerRad*max(calDF$LSTst2), LSTplot[index], sprintf('%.1f', hourPerRad*max(calDF$LSTst2)), pos=4) 
         }
         legend('right',  legend=c('12-m or 7-m Array','Only 12-m Array','7-m Array Window'), col=c('red','blue', 'lightgreen'), lty=1, lwd=c(2,2,8))
-        #if( !is.na(srcDF$LST7min[index])){             # Usable for 7m
-        #    arrows(hourPerRad* srcDF$LST7min[index], LSTplot[index], hourPerRad* srcDF$LST7max[index], LSTplot[index], length=0, lwd=segWidth, col='red')
-        #    if( srcDF$LST7min[index] < 0.0){
-        #        arrows(hourPerRad* srcDF$LST7min[index] + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
-        #    }
-        #    if( srcDF$LST7max[index] > 2.0* pi){
-        #        arrows(0.0, LSTplot[index], hourPerRad* srcDF$LST7max[index] - 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
-        #    }
-        #}
+        if(calibrator %in% LST7DF$Src ){             # Usable for 7m
+            segWidth <- max(30*calDF$P[1], 10)
+            calDF <- LST7DF[LST7DF$Src == calibrator,]
+            arrows(hourPerRad* min(calDF$LSTst1), LSTplot[index], hourPerRad* max(calDF$LSTst2), LSTplot[index], length=0, lwd=segWidth, col='red')
+            if( min(calDF$LSTst1) < 0.0){
+                arrows(hourPerRad* min(calDF$LSTst1) + 24.0, LSTplot[index], 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
+            }
+            if( max(calDF$LSTst2) > 2.0*pi){
+                arrows(0.0, LSTplot[index], hourPerRad* max(calDF$LSTst2) - 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
+            }
+        }
     }
     dev.off()
 }
