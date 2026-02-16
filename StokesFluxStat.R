@@ -1,10 +1,12 @@
 library(parallel)   # multicore parallelization
+library(dplyr)
 library(VGAM)       # for Rice distribution
 Sys.setenv(TZ="UTC")
 sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
 minAntNum <- 5		   # Minimum number of antennas
 numCore = detectCores()
+cat(sprintf('Number of cores = %d\n', numCore))
 sourceMatch <- function(sourceName){
 	sourceDict <- list(
 		c('J0006-0623', 'J0006-063'),
@@ -115,7 +117,8 @@ bandID <- getBand(fileList)
 recordNum <- sum(as.integer(mclapply(fileList, countRec, mc.cores=numCore)))
 #-------- Generage FLDF
 DFList <- mclapply(fileList, readStokesSection, mc.cores=numCore)
-FLDF <- do.call("rbind", DFList)
+#FLDF <- do.call("rbind", DFList)
+FLDF <- bind_rows(DFList)
 #-------- Filter FLDF
 FLDF <- na.omit(FLDF)
 FLDF <- FLDF[FLDF$I > 2.0* FLDF$eI, ]                       # too large error

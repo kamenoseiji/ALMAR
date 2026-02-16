@@ -1,4 +1,5 @@
 library(parallel)   # multicore parallelization
+library(dplyr)
 library(suncalc)
 library(scales)
 numCore = detectCores()

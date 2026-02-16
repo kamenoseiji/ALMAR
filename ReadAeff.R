@@ -5,7 +5,8 @@ source('~/ALMAR/ReadAeffLib.R')
 fileList <- parseArg('UIDList')
 #AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 DFList <- mclapply(fileList, Log2Aeff, mc.cores=numCore)
-AeDF <- do.call("rbind", DFList)
+#AeDF <- do.call("rbind", DFList)
+AeDF <- bind_rows(DFList)
 save(AeDF, file='AeDF.Rdata')
 AeDF <- AeDF[complete.cases(AeDF$AeX),]
 AeDF <- AeDF[complete.cases(AeDF$AeY),]
@@ -16,7 +17,7 @@ AeDF <- AeDF[order(AeDF$Date), ]
 #save(AeDF, file='AeDF.Rdata')
 
 DFList <- mclapply(fileList, Log2Dterm, mc.cores=numCore)
-DtermDF <- do.call("rbind", DFList)
+DtermDF <- bind_all(DFList)
 DtermDF <- DtermDF[complete.cases(DtermDF$Date),]
 DtermDF <- na.omit(DtermDF)
 DtermDF <- DtermDF[order(DtermDF$Date), ]
