@@ -165,14 +165,14 @@ Log2Aeff <- function(fileName){
     fileLines <- readLines(fileName)
     emptyDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]
     colnames(emptyDF) <- FMT
-    if(length(fileLines) < 10){ return(emptyDF) }
-    if(fileLines[1] == ''){ return(emptyDF) }
+    if(length(fileLines) < 10){ return() }
+    if(fileLines[1] == ''){ return() }
     TsysCorr <- readTsysDigital(fileLines)
-    # if(TsysCorr == 'OFF'){ return(emptyDF) }
+    #if(TsysCorr == 'OFF'){ return(emptyDF) }
     # UID <- readUID(fileLines)
     UID <- strsplit(fileName, '[ |-]')[[1]][1]
 	CalList <- findCalibrator(fileLines)
-    if(CalList[[1]][1] == 0){ return(emptyDF) }
+    if(CalList[[1]][1] == 0){ return() }
 	emptyDF  <- readAeffSection(fileLines)
     emptyDF$Band <- getBand(fileName)
     emptyDF$UID <- UID

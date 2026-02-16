@@ -3,21 +3,17 @@ source('~/ALMAR/ReadAeffLib.R')
 #Arguments <- commandArgs(trailingOnly = T)
 #fileList <- parseArg(Arguments)
 fileList <- parseArg('UIDList')
-#AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 DFList <- mclapply(fileList, Log2Aeff, mc.cores=numCore)
-#AeDF <- do.call("rbind", DFList)
-AeDF <- bind_rows(DFList)
-save(AeDF, file='AeDF.Rdata')
+AeDF <- na.omit(bind_rows(DFList))
 AeDF <- AeDF[complete.cases(AeDF$AeX),]
 AeDF <- AeDF[complete.cases(AeDF$AeY),]
 AeDF <- AeDF[((AeDF$AeX > 25.0) & (AeDF$AeX < 100.0) & (AeDF$AeY > 25.0) & (AeDF$AeY < 100.0)),]
 AeDF <- AeDF[complete.cases(AeDF$Date),]
-AeDF <- na.omit(AeDF)
 AeDF <- AeDF[order(AeDF$Date), ]
-#save(AeDF, file='AeDF.Rdata')
+save(AeDF, file='AeDF.Rdata')
 
 DFList <- mclapply(fileList, Log2Dterm, mc.cores=numCore)
-DtermDF <- bind_all(DFList)
+DtermDF <- bind_rows(DFList)
 DtermDF <- DtermDF[complete.cases(DtermDF$Date),]
 DtermDF <- na.omit(DtermDF)
 DtermDF <- DtermDF[order(DtermDF$Date), ]
