@@ -5,6 +5,7 @@ source('~/ALMAR/ReadAeffLib.R')
 fileList <- parseArg('UIDList')
 DFList <- mclapply(fileList, Log2Aeff, mc.cores=numCore)
 AeDF <- na.omit(bind_rows(DFList))
+save(AeDF, file='AeDF.Rdata')
 AeDF <- AeDF[complete.cases(AeDF$AeX),]
 AeDF <- AeDF[complete.cases(AeDF$AeY),]
 AeDF <- AeDF[((AeDF$AeX > 25.0) & (AeDF$AeX < 100.0) & (AeDF$AeY > 25.0) & (AeDF$AeY < 100.0)),]

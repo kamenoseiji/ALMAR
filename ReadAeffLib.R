@@ -59,15 +59,23 @@ readAeffSection <- function(Lines){
     spwLabel <- strsplit(Lines[pointer - 1], '[ |:]+')[[1]]; spwLabel <- spwLabel[(which(spwLabel=='Aeff')+1):length(spwLabel)]
     spwLabel <- spwLabel[grep('SPW', spwLabel)] 
     XspwList <- grep("-X", spwLabel) + 2; YspwList <- grep("-Y", spwLabel) + 2
-    FMT <- c('Ant', 'AeX', 'AeY')
+    FMT <- c('Ant', 'AeX1', 'AeY1', 'AeX2', 'AeY2', 'AeX3', 'AeY3', 'AeX4', 'AeY4')
     DF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(DF) <- FMT
 	while(length(grep('[--|%]',Lines[pointer])) > 0){
 	    if( strsplit(Lines[pointer], ' ')[[1]][2] != ':'){ break }
         if( length(grep('--', Lines[pointer])) != 0 ){pointer <- pointer + 1; next}
         tmpDF <- data.frame(
             Ant = strsplit(Lines[pointer], ' ')[[1]][1],
-            AeX = median(as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][XspwList])),
-            AeY = median(as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][YspwList])))
+            #AeX = median(as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][XspwList])),
+            #AeY = median(as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][YspwList])))
+            AeX1 = as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][XspwList[1]]),
+            AeY1 = as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][YspwList[1]]),
+            AeX2 = as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][XspwList[2]]),
+            AeY2 = as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][YspwList[2]]),
+            AeX3 = as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][XspwList[3]]),
+            AeY3 = as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][YspwList[3]]),
+            AeX4 = as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][XspwList[4]]),
+            AeY4 = as.numeric(strsplit(Lines[pointer], '[ |%]+')[[1]][YspwList[4]]))
         DF <- rbind(DF, tmpDF)
 		pointer <- pointer + 1
 	}
@@ -161,7 +169,8 @@ SPL_period <- function(DF, refPeriod, weight=c(0,0)){
 }
 #-------- Read Aeff section and store into a data frame
 Log2Aeff <- function(fileName){
-    FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'UID', 'TsysCorr')
+    #FMT <- c('Ant', 'AeX', 'AeY', 'Band', 'calibrator', 'EL', 'Date', 'sunset', 'UID', 'TsysCorr')
+    FMT <- c('Ant', 'AeX1', 'AeY1', 'AeX2', 'AeY2','AeX3', 'AeY3','AeX4', 'AeY4','Band', 'calibrator', 'EL', 'Date', 'sunset', 'UID', 'TsysCorr')
     fileLines <- readLines(fileName)
     emptyDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]
     colnames(emptyDF) <- FMT
