@@ -12,7 +12,7 @@
 #   install.packages('plotrix') ,in advance, unless installed
 # Caution : No space between the option flag and parameter, i.e. '-F2016-04-01' is OK but '-F 2016-04-01' is invalid.
 #
-library(plotrix)
+library(xtable)
 parseArg <- function( args ){
     argList <- list('2012-01-01', '2026-01-01', 'J1331+3030', '3,7', '10', '15', FALSE)
     names(argList) <- c('ST', 'ET', 'Source', 'Band', 'bin', 'width', 'Load')
@@ -52,26 +52,26 @@ bindDate <- function(df, bin, width){
         if(nrow(subDF) < 1){
             DF[index,]$I <- NA
         } else {
-            subDF$weight <- exp(-abs( as.numeric( as.Date(subDF$Date) - as.Date(DF[index,]$Date))) / width)
-            repI <- weightedMean(subDF$I, subDF$eI, subDF$weight); DF[index, ]$I <- repI[1]; DF[index, ]$eI <- repI[2]
-            repQ <- weightedMean(subDF$Q, subDF$eQ, subDF$weight); DF[index, ]$Q <- repQ[1]; DF[index, ]$eQ <- repQ[2]
-            repU <- weightedMean(subDF$U, subDF$eU, subDF$weight); DF[index, ]$U <- repU[1]; DF[index, ]$eU <- repU[2]
-            repV <- weightedMean(subDF$V, subDF$eV, subDF$weight); DF[index, ]$V <- repV[1]; DF[index, ]$eV <- repV[2]
+            subDF$offset <- as.numeric( as.Date(subDF$Date) - as.Date(DF[index,]$Date) )
+            #repI <- weightedMean( data.frame(offset
+            #repI <- weightedMean(subDF$I, subDF$eI, subDF$weight); DF[index, ]$I <- repI[1]; DF[index, ]$eI <- repI[2]
+            #repQ <- weightedMean(subDF$Q, subDF$eQ, subDF$weight); DF[index, ]$Q <- repQ[1]; DF[index, ]$eQ <- repQ[2]
+            #repU <- weightedMean(subDF$U, subDF$eU, subDF$weight); DF[index, ]$U <- repU[1]; DF[index, ]$eU <- repU[2]
+            #repV <- weightedMean(subDF$V, subDF$eV, subDF$weight); DF[index, ]$V <- repV[1]; DF[index, ]$eV <- repV[2]
         }
     }
     return( na.omit(DF) )
 }
 
-weightedMean <- function(value, err, weight){
+weightedMean <- function(value, err, offset){
+    
     wvalue <- weight / err^2
     sumWeight <- sum(wvalue)
     represent <- value %*% wvalue / sumWeight
     repErr    <- sqrt( err^2 %*% wvalue^2) / sumWeight
     return( c(represent, repErr) )
 }
-
-
-plotQU <- function(df, color='black'){
+plotIP <- function(df, color='black'){
     numPoints <- nrow(df)
     numGrad <- 16
     alpha_grad <- seq(0.0, 0.1, length.out=numGrad)
@@ -80,10 +80,6 @@ plotQU <- function(df, color='black'){
     abline(h=0)
     arrows(df$Q, df$U-df$eU, df$Q, df$U+df$eU, length=0, col=color, lwd=0.25)
     arrows(df$Q-df$eQ, df$U, df$Q+df$eQ, df$U, length=0, col=color, lwd=0.25)
-    for(index in 1:numGrad){
-        current_col <- adjustcolor(color, alpha.f=alpha_grad[index])
-        draw.ellipse(df$Q, df$U, a=(numGrad - index + 1)*df$eQ/numGrad, b=(numGrad - index + 1)*df$eU/numGrad, col=current_col, border=NA)
-    }
     points(df$Q, df$U,pch=20, col=color, cex=4.0e-3/sqrt(df$eQ^2 + df$eU^2))
     arrows(df[1:(numPoints-1),]$Q, df[1:(numPoints-1),]$U, df[2:numPoints,]$Q, df[2:numPoints,]$U, lwd=2, length=0.1, col=color)
     text(df$Q, df$U, substr(as.character(df$Date), 6, 10), col=color, pos=2, cex=0.5)
@@ -92,7 +88,7 @@ BandRepFreq <- c(40, 86.0, 97.5, 154.9, 183.0, 233.0, 343.4)
 BandColors <- c('firebrick4', 'deeppink4', 'orangered4', 'darkgreen', 'turquoise4', 'royalblue4', 'purple4')
 #-------- Start
 #Arguments <- commandArgs(trailingOnly = TRUE)
-Arguments <- strsplit('-F2024-01-01 -E2026-03-01 -SJ1256-0547 -B3,6,7 -b10 -w10', ' ')[[1]]    # for debugging
+Arguments <- strsplit('-F2024-01-01 -E2026-03-03 -SJ1256-0547 -B3,6,7 -b10 -w10', ' ')[[1]]    # for debugging
 argList <- parseArg(Arguments)
 setwd('./')
 #-------- Load Flux.Rdata from web
@@ -112,11 +108,15 @@ for(band in bandList){
         bandList <- bandList[!bandList %in% band]
         next
     }
-    df <- bindSPW(df)
-    df$Src <- argList$Source
-    DF <- bindDate(df, argList$bin, argList$width)
-    DF$P <- sqrt(DF$Q^2 + DF$U^2); DF$eP <- 
-    assign(sprintf('B%d', band), DF)
+    #df <- bindSPW(df)
+    #df$Src <- argList$Source
+    #DF <- bindDate(df, argList$bin, argList$width)
+    #DF$P <- sqrt(DF$Q^2 + DF$U^2); DF$eP <- sqrt(DF$eQ^2 + DF$eU^2); DF$EVPA <- 90*atan2(DF$U, DF$Q)/pi; DF$eEVPA <- 90* sqrt(DF$Q^2 * DF$eU^2 + DF$U^2 * DF$eQ^2) / (DF$P)^2/pi
+    #assign(sprintf('B%d', band), DF)
+    #for(index in 1:nrow(DF)){
+    #    text_sd <- sprintf('%s : %5.2f (%4.2f)  %5.2f (%4.2f) %5.1f (%3.1f)\n', as.Date(DF[index,]$Date), DF[index,]$I, DF[index,]$eI,  DF[index,]$P, DF[index,]$eP,  DF[index,]$EVPA, DF[index,]$eEVPA)
+    #    cat(text_sd)
+    #}
 }
 #if(0){
 ##-------- Plot (Q, U)
