@@ -29,48 +29,52 @@ parseArg <- function( args ){
     }
     return(argList)
 }
-bindSPW <- function(df){
+bindSPW <- function(df, refDate, width){
     centerfreq <- median(df$Freq)
-    DF <- data.frame(Date = sort(unique(df$Date)), Freq=centerfreq, I=0, eI=-1, Q=0, eQ=-1, U=0, eU=-1, V=0, eV=-1)
-    for(date in DF$Date){
-        index <- which(DF$Date == date)
-        dayDF <- df[df$Date == date,]
-        dayDF$Freq <- dayDF$Freq - centerfreq
-        fitI <- lm( formula=I ~ Freq, data=dayDF, weight=1/eI^2); DF[index,]$I <- as.numeric(coef(summary(fitI))[[1]]); DF[index,]$eI <- as.numeric(coef(summary(fitI))[[3]])
-        fitQ <- lm( formula=Q ~ Freq, data=dayDF, weight=1/eQ^2); DF[index,]$Q <- as.numeric(coef(summary(fitQ))[[1]]); DF[index,]$eQ <- as.numeric(coef(summary(fitQ))[[3]])
-        fitU <- lm( formula=U ~ Freq, data=dayDF, weight=1/eU^2); DF[index,]$U <- as.numeric(coef(summary(fitU))[[1]]); DF[index,]$eU <- as.numeric(coef(summary(fitU))[[3]])
-        fitV <- lm( formula=V ~ Freq, data=dayDF, weight=1/eV^2); DF[index,]$V <- as.numeric(coef(summary(fitV))[[1]]); DF[index,]$eV <- as.numeric(coef(summary(fitV))[[3]])
-    }
-    return( DF )
-}
-bindDate <- function(df, bin, width){
-    DF <- data.frame( Date = seq(min(df$Date), max(df$Date), by=width*86400))
-    DF$eV <- DF$V <- DF$eU <- DF$U <- DF$eQ <- DF$Q <- DF$eI <- DF$I <- numeric(nrow(DF))
-    #for(refDate in as.Date(DF$Date)){
+    DF <- data.frame(Date = refDate, Freq=centerfreq, I=0, eI=-1, Q=0, eQ=-1, U=0, eU=-1, V=0, eV=-1)
     for(index in 1:nrow(DF)){
-        subDF <- df[ abs(as.Date(df$Date) - as.Date(DF[index,]$Date)) < width,]
-        if(nrow(subDF) < 1){
+        thisDate <- DF[index,]$Date
+        subDF <- df[ abs(as.Date(df$Date) - as.Date(thisDate)) < width,]
+        if(nrow(subDF) < 2){
             DF[index,]$I <- NA
-        } else {
-            subDF$offset <- as.numeric( as.Date(subDF$Date) - as.Date(DF[index,]$Date) )
-            #repI <- weightedMean( data.frame(offset
-            #repI <- weightedMean(subDF$I, subDF$eI, subDF$weight); DF[index, ]$I <- repI[1]; DF[index, ]$eI <- repI[2]
-            #repQ <- weightedMean(subDF$Q, subDF$eQ, subDF$weight); DF[index, ]$Q <- repQ[1]; DF[index, ]$eQ <- repQ[2]
-            #repU <- weightedMean(subDF$U, subDF$eU, subDF$weight); DF[index, ]$U <- repU[1]; DF[index, ]$eU <- repU[2]
-            #repV <- weightedMean(subDF$V, subDF$eV, subDF$weight); DF[index, ]$V <- repV[1]; DF[index, ]$eV <- repV[2]
+            next
         }
+        relDF <- data.frame( relDate = as.numeric(as.Date(subDF$Date) - as.Date(thisDate)), refFreq = subDF$Freq - centerfreq, I = subDF$I, eI=subDF$eI, Q = subDF$Q, eQ=subDF$eQ, U = subDF$U, eU=subDF$eU, V = subDF$V, eV=subDF$eV )
+        fitI <- lm(formula = I ~ relDate + refFreq, data=relDF, weight = 1/eI^2); DF[index,]$I <- as.numeric(coef(summary(fitI))[[1]]); DF[index,]$eI <- as.numeric(coef(summary(fitI))[[4]])
+        fitQ <- lm(formula = Q ~ relDate + refFreq, data=relDF, weight = 1/eQ^2); DF[index,]$Q <- as.numeric(coef(summary(fitQ))[[1]]); DF[index,]$eQ <- as.numeric(coef(summary(fitQ))[[4]])
+        fitU <- lm(formula = U ~ relDate + refFreq, data=relDF, weight = 1/eU^2); DF[index,]$U <- as.numeric(coef(summary(fitU))[[1]]); DF[index,]$eU <- as.numeric(coef(summary(fitU))[[4]])
+        fitV <- lm(formula = V ~ relDate + refFreq, data=relDF, weight = 1/eV^2); DF[index,]$V <- as.numeric(coef(summary(fitV))[[1]]); DF[index,]$eV <- as.numeric(coef(summary(fitV))[[4]])
     }
     return( na.omit(DF) )
 }
-
-weightedMean <- function(value, err, offset){
-    
-    wvalue <- weight / err^2
-    sumWeight <- sum(wvalue)
-    represent <- value %*% wvalue / sumWeight
-    repErr    <- sqrt( err^2 %*% wvalue^2) / sumWeight
-    return( c(represent, repErr) )
-}
+#bindDate <- function(df, bin, width){
+#    DF <- data.frame( Date = seq(min(df$Date), max(df$Date), by=width*86400))
+#    DF$eV <- DF$V <- DF$eU <- DF$U <- DF$eQ <- DF$Q <- DF$eI <- DF$I <- numeric(nrow(DF))
+#    #for(refDate in as.Date(DF$Date)){
+#    for(index in 1:nrow(DF)){
+#        subDF <- df[ abs(as.Date(df$Date) - as.Date(DF[index,]$Date)) < width,]
+#        if(nrow(subDF) < 1){
+#            DF[index,]$I <- NA
+#        } else {
+#            subDF$offset <- as.numeric( as.Date(subDF$Date) - as.Date(DF[index,]$Date) )
+#            #repI <- weightedMean( data.frame(offset
+#            #repI <- weightedMean(subDF$I, subDF$eI, subDF$weight); DF[index, ]$I <- repI[1]; DF[index, ]$eI <- repI[2]
+#            #repQ <- weightedMean(subDF$Q, subDF$eQ, subDF$weight); DF[index, ]$Q <- repQ[1]; DF[index, ]$eQ <- repQ[2]
+#            #repU <- weightedMean(subDF$U, subDF$eU, subDF$weight); DF[index, ]$U <- repU[1]; DF[index, ]$eU <- repU[2]
+#            #repV <- weightedMean(subDF$V, subDF$eV, subDF$weight); DF[index, ]$V <- repV[1]; DF[index, ]$eV <- repV[2]
+#        }
+#    }
+#    return( na.omit(DF) )
+#}
+#
+#weightedMean <- function(value, err, offset){
+#    
+#    wvalue <- weight / err^2
+#    sumWeight <- sum(wvalue)
+#    represent <- value %*% wvalue / sumWeight
+#    repErr    <- sqrt( err^2 %*% wvalue^2) / sumWeight
+#    return( c(represent, repErr) )
+#}
 plotIP <- function(df, color='black'){
     numPoints <- nrow(df)
     numGrad <- 16
@@ -87,8 +91,8 @@ plotIP <- function(df, color='black'){
 BandRepFreq <- c(40, 86.0, 97.5, 154.9, 183.0, 233.0, 343.4)
 BandColors <- c('firebrick4', 'deeppink4', 'orangered4', 'darkgreen', 'turquoise4', 'royalblue4', 'purple4')
 #-------- Start
-#Arguments <- commandArgs(trailingOnly = TRUE)
-Arguments <- strsplit('-F2024-01-01 -E2026-03-03 -SJ1256-0547 -B3,6,7 -b10 -w10', ' ')[[1]]    # for debugging
+Arguments <- commandArgs(trailingOnly = TRUE)
+#Arguments <- strsplit('-F2024-01-01 -E2026-03-03 -SJ1256-0547 -B3,6,7 -b10 -w10', ' ')[[1]]    # for debugging
 argList <- parseArg(Arguments)
 setwd('./')
 #-------- Load Flux.Rdata from web
@@ -102,22 +106,23 @@ if( argList$Load ){
 }
 #-------- Filter by the source, date, and band
 bandList <- as.numeric(strsplit(argList$Band, ',')[[1]])
+refDate <- seq(as.Date(argList$ST), as.Date(argList$ET), by=argList$bin)
 for(band in bandList){
-    df <- FLDF[((FLDF$Src == argList$Source) & (abs(FLDF$Freq - BandRepFreq[band]) < 12.0) & (as.Date(FLDF$Date) >= as.Date(argList$ST)) & (as.Date(FLDF$Date) <= as.Date(argList$ET))),]
+    df <- FLDF[((FLDF$Src == argList$Source) & (abs(FLDF$Freq - BandRepFreq[band]) < 12.0) & (as.Date(FLDF$Date) >= as.Date(argList$ST) - argList$width) & (as.Date(FLDF$Date) <= as.Date(argList$ET) + argList$width)),]
     if(nrow(df) < 2){
         bandList <- bandList[!bandList %in% band]
         next
     }
-    #df <- bindSPW(df)
+    DF <- bindSPW(df, refDate, argList$width)
     #df$Src <- argList$Source
     #DF <- bindDate(df, argList$bin, argList$width)
     #DF$P <- sqrt(DF$Q^2 + DF$U^2); DF$eP <- sqrt(DF$eQ^2 + DF$eU^2); DF$EVPA <- 90*atan2(DF$U, DF$Q)/pi; DF$eEVPA <- 90* sqrt(DF$Q^2 * DF$eU^2 + DF$U^2 * DF$eQ^2) / (DF$P)^2/pi
-    #assign(sprintf('B%d', band), DF)
+    assign(sprintf('B%d', band), DF)
+}
     #for(index in 1:nrow(DF)){
     #    text_sd <- sprintf('%s : %5.2f (%4.2f)  %5.2f (%4.2f) %5.1f (%3.1f)\n', as.Date(DF[index,]$Date), DF[index,]$I, DF[index,]$eI,  DF[index,]$P, DF[index,]$eP,  DF[index,]$EVPA, DF[index,]$eEVPA)
     #    cat(text_sd)
     #}
-}
 #if(0){
 ##-------- Plot (Q, U)
 #dfList <- sprintf('B%d', bandList)
