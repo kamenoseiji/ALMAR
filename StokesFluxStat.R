@@ -117,12 +117,17 @@ bandID <- getBand(fileList)
 recordNum <- sum(as.integer(mclapply(fileList, countRec, mc.cores=numCore)))
 #-------- Generage FLDF
 DFList <- mclapply(fileList, readStokesSection, mc.cores=numCore)
-#FLDF <- do.call("rbind", DFList)
 FLDF <- bind_rows(DFList)
+FLDF.org <- FLDF                                            # Save before flagging
 #-------- Filter FLDF
+naFiles <- unique(subset(FLDF,complete.cases(FLDF)==F)$File)
+for(naFile in naFiles){ cat(sprintf('NA : %s\n', naFile)) }
 FLDF <- na.omit(FLDF)
+FLDF <- FLDF[FLDF$I > 0.0, ]                                # Positive Stokes I
 FLDF <- FLDF[FLDF$I > 2.0* FLDF$eI, ]                       # too large error
 FLDF <- FLDF[FLDF$I^2  > FLDF$Q^2 + FLDF$U^2 +  FLDF$V^2,]  # polarization degree
+flagFiles <- setdiff(unique(FLDF.org$File), unique(FLDF$File))
+for(flagFile in flagFiles){ cat(sprintf('FG : %s\n', flagFile)) }
 FLDF$Src <- as.character(mclapply(as.character(FLDF$Src), sourceMatch,mc.cores=numCore))
 FLDF$eI <- sqrt(FLDF$eI^2 + (sysIerr*FLDF$I)^2)
 FLDF$eQ <- sqrt(FLDF$eQ^2 + (sysPerr*FLDF$Q)^2)
@@ -131,4 +136,3 @@ FLDF$eV <- sqrt(FLDF$eV^2 + (sysPerr*FLDF$V)^2)
 FLDF$Date <- as.POSIXct(FLDF$Date, tz="GMT")
 FLDF <- FLDF[order(FLDF$Date),]
 save(FLDF, file='Flux.Rdata')
-largeErrorEBs <- unique( FLDF[((substr(FLDF$Src,1,1) == 'J') & (FLDF$eI > 10)),]$File)

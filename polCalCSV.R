@@ -8,13 +8,6 @@ BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/1
 BandFreq<-c(43.0,  75.0, 97.5, 132.0,183.0, 233.0, 343.5,400.0, 650.0, 800.0)
 Pthresh7<-c(0.058, 0.060, 0.069, 0.058, 0.086, 0.077, 0.094, 0.153, 0.442, 0.765) # for 7m array, 5-sigma thresholds for polarized flux
 Pthresh12 <- 0.5* Pthresh7     # for 12m array 
-# sigma <- function(integ,tsys){
-#    ae <- 0.7*pi*9
-#    nant <- 10
-#    kb <- 1380
-#    bw <- 16e6
-#    return(2*kb*tsys/(ae*sqrt(nant*(nant-1)*bw*integ*2)))}
-# 5.0* sigma( c(150, 200, 200, 300, 300, 300, 600, 900, 1200, 1200), c(55,65,75,77,115,103,178,353,1179,2041) )
 mthresh <- 0.03                                                                   # polarization degree threshold
 SECPERDAY <- 86400
 hourPerRad <- 12/pi		# radian to hour angle conversion
@@ -193,7 +186,6 @@ FLDF$EVPA  <- 0.5* atan2(FLDF$U, FLDF$Q)
 FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P^2)
 FLDF$relTime <- as.numeric(FLDF$Date) - as.numeric(as.POSIXct(Sys.time()))  # Relative second since now
 sourceList <- sort(unique(FLDF$Src))
-numSrc <- length(sourceList)
 FLDF$medP <- FLDF$freqRange <- numeric(nrow(FLDF))
 for(src in sourceList){ FLDF[FLDF$Src == src,]$medP <- median(FLDF[FLDF$Src == src,]$P)}
 for(src in sourceList){ FLDF[FLDF$Src == src,]$freqRange <- diff(range(FLDF[FLDF$Src == src,]$Freq))}
