@@ -22,6 +22,7 @@ minSinEL <- sin(30/RADDEG)
 sessionDuration <- 1.0/hourPerRad	# at least 1 hour for session, in [rad]
 pointingDuration <- 0.1/hourPerRad	# 0.1 hourss in [rad]
 DateRange <- 60    # 60-day window
+source('../StatStokes.R')
 #-------- # cos(hour angle) when it passes the given EL
 EL_HA <- function(sinEL, dec){
 	cosHA <- (sinEL - sin_phi* sin(dec)) / (cos_phi* cos(dec))
@@ -38,26 +39,6 @@ ha2azel <-function(ha, phi=ALMA_LAT, dec=0){
     az <- atan2(cos(dec)*sin(ha), sin(phi)*cos(dec)*cos(ha) - cos(phi)*sin(dec)) + pi
     pa <- atan2(sin(ha), tan(phi)*cos(dec) - sin(dec)* cos(ha))
     return(data.frame(ha=ha, az=az, el=el, pa=pa))
-}
-#-------- Estimate Stokes parameters by freqneyc and date 
-estimateIQUV <- function(DF, refFreq){
-    DF$relFreq <- DF$Freq / refFreq
-    timeWeightSoftening <- 5* 86400 # 5-day softening
-    if( (max(DF$relFreq) < 0.65) | (max(DF$relFreq) / min(DF$relFreq) < 2.0 )){ return( data.frame( Src=DF$Src[1], I=0.0, eI=0.0, Q=0.0, U=0.0, V=0.0, P=0.0, eP=0.0, EVPA=0.0))}
-    DF$timeFreqDeparture <- (abs(DF$relTime) + timeWeightSoftening) * (1.0 + abs(DF$relFreq - 1))
-    if( (diff(range(DF$relTime)) < 0.25* DateRange* SECPERDAY) | (max(DF$relTime) < -0.25* SECPERDAY)){      # small number of data
-        fitI <- lm(formula=log(I) ~ log(relFreq), data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
-	    fitP <- lm(formula=log(P) ~ log(relFreq), data=DF, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
-   } else {
-        fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
-	    fitP <- lm(formula=log(P) ~ log(relFreq) + relTime, data=DF, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
-    }
-    weight <- 1.0/(abs(DF$eEVPA) * sqrt(DF$eQ^2 + DF$eU^2)* abs(log(DF$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(DF$relTime + timeWeightSoftening)))
-    Twiddle <- sum( weight* exp((0.0 + 2.0i)*DF$EVPA) ) / sum(weight); Twiddle <- Twiddle/abs(Twiddle)
-    IQUV <- data.frame(Src=DF$Src[1], I=exp(coef(fitI)[[1]]), eI=exp(coef(fitI)[[1]])* (exp(coef(summary(fitI))[1,2])-1), Q=0.0, U=0.0, V=0.0, P=exp(coef(fitP)[[1]]), eP=exp(coef(fitP)[[1]])* (exp(coef(summary(fitP))[1,2])-1), EVPA=0.5*Arg(Twiddle))
-    IQUV$Q <- IQUV$P* Re(Twiddle)
-    IQUV$U <- IQUV$P* Im(Twiddle)
-	return( IQUV )
 }
 #-------- Plot LST
 plotLST <- function(DF, band){
@@ -87,12 +68,11 @@ plotLST <- function(DF, band){
 srcFreqCalibrator <- function(DF, band){
     sourceList <- sort(unique(DF$Src))
     numSrc <- length(sourceList)
-    srcDF <- data.frame(Src=sourceList, I=numeric(numSrc), eI=numeric(numSrc), Q=numeric(numSrc), U= numeric(numSrc), V=numeric(numSrc), P=numeric(numSrc), eP=numeric(numSrc), EVPA=numeric(numSrc))
-    for(src_index in 1:numSrc){
-        src <- sourceList[src_index]
+    srcDF <- data.frame(Src=sourceList, I=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), V=numeric(numSrc), P=numeric(numSrc), EVPA=numeric(numSrc), eI=numeric(numSrc), eQ=numeric(numSrc), eU=numeric(numSrc), eV=numeric(numSrc), eP=numeric(numSrc), eEVPA=numeric(numSrc))
+    for(src in sourceList){
         SDF <- DF[((DF$Src == src) & (DF$I < median(DF$I) + 3.0* sd(DF$I)) & (DF$P < median(DF$P) + 3.0* sd(DF$P))),]   # Filter reliable data
         if(nrow(SDF) < 3){ next }
-        srcDF[src_index,] <- estimateIQUV(SDF, BandFreq[band])
+        srcDF[srcDF$Src == src,] <- estimateIQUV(SDF, BandFreq[band])
     }
     srcDF$RA  <- pi* (60.0* as.numeric(substring(sourceList, 2, 3)) + as.numeric(substring(sourceList, 4, 5))) / 720.0
     srcDF$DEC <- pi* sign(as.numeric(substring(sourceList, 6, 10)))* (as.numeric(substring(sourceList, 7, 8)) + as.numeric(substring(sourceList, 9, 10))/60.0) / 180.0
@@ -180,11 +160,11 @@ load("Flux.Rdata")     # Data frame of FLDF
 FLDF <- FLDF[as.Date(FLDF$Date) > Sys.Date() - DateRange,]  # Data frame within DateRange
 #-------- Filter quasars
 FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]    # only quasars
-FLDF$P  <- sqrt(FLDF$Q^2 + FLDF$U^2)
-FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
-FLDF$EVPA  <- 0.5* atan2(FLDF$U, FLDF$Q)
-FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P^2)
 FLDF$relTime <- as.numeric(FLDF$Date) - as.numeric(as.POSIXct(Sys.time()))  # Relative second since now
+FLDF$P  <- sqrt(FLDF$Q^2 + FLDF$U^2)
+#FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
+#FLDF$EVPA  <- 0.5* atan2(FLDF$U, FLDF$Q)
+#FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P^2)
 sourceList <- sort(unique(FLDF$Src))
 FLDF$medP <- FLDF$freqRange <- numeric(nrow(FLDF))
 for(src in sourceList){ FLDF[FLDF$Src == src,]$medP <- median(FLDF[FLDF$Src == src,]$P)}

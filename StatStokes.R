@@ -1,20 +1,68 @@
 #-------- Estimate Stokes parameters by freqneyc and date 
 estimateIQUV <- function(DF, refFreq){
     DF$relFreq <- DF$Freq / refFreq
+    df <- subset(DF[,c('relFreq', 'I', 'eI', 'Q', 'eQ', 'U', 'eU', 'V', 'eV', 'relTime')], is.finite(relFreq) & is.finite(I) & is.finite(eI) & is.finite(relTime) & I > 0 & eI > 0 & relFreq > 0)
+    df$P  <- sqrt(df$Q^2 + df$U^2)
+    df$eP <- sqrt(df$eQ^2 + df$eU^2)
+    df$EVPA  <- 0.5* atan2(df$U, df$Q)
+    df$eEVPA <- 0.5* sqrt(df$Q^2 * df$eU^2 + df$U^2 * df$eQ^2) / (df$P^2)
+    IQUV <- data.frame(Src=DF$Src[1], I=0.0, Q=0.0, U=0.0, V=0.0, P=0.0, EVPA=NA, eI=0.0, eQ=0.0, eU=0.0, eV=0.0, eP=0.0, eEVPA=0.0)
     timeWeightSoftening <- 5* 86400 # 5-day softening
-    if( (max(DF$relFreq) < 0.65) | (max(DF$relFreq) / min(DF$relFreq) < 2.0 )){ return( data.frame( Src=DF$Src[1], I=0.0, Q=0.0, U=0.0, V=0.0, P=0.0, EVPA=0.0))}
-    DF$timeFreqDeparture <- (abs(DF$relTime) + timeWeightSoftening) * (1.0 + abs(DF$relFreq - 1))
-    if( (diff(range(DF$relTime)) < 0.25* DateRange* SECPERDAY) | (max(DF$relTime) < -0.25* SECPERDAY)){      # small number of data
-        fitI <- lm(formula=log(I) ~ log(relFreq), data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
-        fitP <- lm(formula=log(P) ~ log(relFreq), data=DF, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
-    } else {
-        fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=DF, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
-        fitP <- lm(formula=log(P) ~ log(relFreq) + relTime, data=DF, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
-    }
-    weight <- 1.0/(abs(DF$eEVPA) * sqrt(DF$eQ^2 + DF$eU^2)* abs(log(DF$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(DF$relTime + timeWeightSoftening)))
-    Twiddle <- sum( weight* exp((0.0 + 2.0i)*DF$EVPA) ) / sum(weight); Twiddle <- Twiddle/abs(Twiddle)
-    IQUV <- data.frame(Src=DF$Src[1], I=exp(coef(fitI)[[1]]), Q=0.0, U=0.0, V=0.0, P=exp(coef(fitP)[[1]]), EVPA=0.5*Arg(Twiddle))
+    if( (max(df$relFreq) < 0.65) | (max(df$relFreq) / min(df$relFreq) < 2.0 )){ return( IQUV )}
+    df$timeFreqDeparture <- (abs(df$relTime) + timeWeightSoftening) * (1.0 + abs(df$relFreq - 1))
+    fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=df, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
+    fitP <- lm(formula=log(P) ~ log(relFreq) + relTime, data=df, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
+    df$V <- df$V*df$relFreq^coef(summary(fitI))[2]
+    fitV <- lm(formula=V ~ relTime, data=df, weight=(I / eV) * (timeWeightSoftening / timeFreqDeparture))
+    weight <- 1.0/(abs(df$eEVPA) * sqrt(df$eQ^2 + df$eU^2)* abs(log(df$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(df$relTime + timeWeightSoftening)))
+    Twiddle <- sum( weight* exp((0.0 + 2.0i)*df$EVPA) ) / sum(weight); Twiddle <- Twiddle/abs(Twiddle)
+    IQUV$I <- exp(coef(fitI)[[1]])
+    IQUV$eI <- IQUV$I* coef(summary(fitI))[4]
+    IQUV$P <- exp(coef(fitP)[[1]])
+    IQUV$eP <- IQUV$P* coef(summary(fitP))[4]
     IQUV$Q <- IQUV$P* Re(Twiddle)
     IQUV$U <- IQUV$P* Im(Twiddle)
+    IQUV$EVPA  <- 0.5* Arg(Twiddle)
+    IQUV$eQ <- IQUV$Q* IQUV$eP / IQUV$P
+    IQUV$eU <- IQUV$U* IQUV$eP / IQUV$P
+    IQUV$eEVPA <- 0.5*sqrt(IQUV$Q^2 * IQUV$eU^2 + IQUV$U^2 * IQUV$eQ^2) / (IQUV$P^2)
+    IQUV$V <- coef(summary(fitV))[1]
+    IQUV$eV <- coef(summary(fitV))[4]
     return( IQUV )
+}
+#library(KFAS)
+#KalmanIQUV <- function(DF, refFreq){
+#    #-------- Kalman filtering for Stokes I and spectral index
+#    datI <- subset(DF[,c("relFreq", "I", "eI", "relTime")], is.finite(relFreq) & is.finite(I) & is.finite(eI) & is.finite(relTime) & I > 0 & eI > 0 & relFreq > 0)
+#    #-------- Observation equation : logI = log(I)
+#    datI$logI <- log(datI$I); datI$var_logI <- (datI$eI / datI$I)^2
+#    #-------- Build state-space model : State vector: a_t = [beta0_t, beta1_t], Observation: y_t = [1, log(Freq_t)] a_t + eps_t
+#    Z_array <- array(NA_real_, dim = c(1, 2, nrow(datI)))
+#    Z_array[1,1,] <- 1
+#    Z_array[1,2,] <- log(datI$relFreq)
+#    #-------- Random-walk state evolution
+#    build_model <- function(log_q0, log_q1) {
+#        Qmat <- diag(c(exp(log_q0), exp(log_q1)))
+#        SSModel( datI$logI ~ -1 + SSMcustom(Z = Z_array, T = diag(2), R = diag(2), Q = Qmat, a1 = c(mean(datI$logI), 0), P1 = diag(1e6, 2)), H = array(datI$var_logI, c(1,1,nrow(datI))))
+#    }
+#    #-------- Maximum likelihood estimation of state variances
+#    init_par <- log(c( var(datI$logI, na.rm = TRUE) * 1e-3, 1e-3))
+#    fit <- fitSSM( inits = init_par, model = build_model(init_par[1], init_par[2]), updatefn = function(pars, model) {
+#            model$Q[,,1] <- diag(exp(pars))
+#            model }, method = "BFGS")
+#    model_fit <- fit$model
+#    #-------- Kalman smoothing
+#    kfs <- KFS( model_fit, smoothing = c("state", "signal"))
+#    #-------- Estimate state at t = 0
+#    beta_hat <- kfs$alphahat
+#    last_state <- beta_hat[nrow(datI), ]
+#    V_last <- kfs$V[,,nrow(datI)] # State covariance at final epoch
+#    V0 <- V_last
+#    beta0_now <- last_state[1]
+#    alpha_now <- last_state[2]
+#    se_beta0_now <- sqrt(V0[1,1]) 
+#    se_alpha_now <- sqrt(V0[2,2])
+#    S_now <- exp(beta0_now)
+#    se_S_now <- S_now * se_beta0_now
+#    return(c(S_now, se_S_now, alpha_now, se_alpha_now))
 }
