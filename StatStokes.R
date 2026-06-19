@@ -65,4 +65,4 @@ estimateIQUV <- function(DF, refFreq){
 #    S_now <- exp(beta0_now)
 #    se_S_now <- S_now * se_beta0_now
 #    return(c(S_now, se_S_now, alpha_now, se_alpha_now))
-}
+#}

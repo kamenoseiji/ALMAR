@@ -1,7 +1,10 @@
+library(RCurl)
 library(RColorBrewer)
 library(plotly, warn.conflicts=FALSE)
 library(pandoc)
 library(htmlwidgets)   # multicore parallelization
+#eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
+source('../StatStokes.R')
 #-------- FE-specific PA
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
@@ -22,7 +25,6 @@ minSinEL <- sin(30/RADDEG)
 sessionDuration <- 1.0/hourPerRad	# at least 1 hour for session, in [rad]
 pointingDuration <- 0.1/hourPerRad	# 0.1 hourss in [rad]
 DateRange <- 60    # 60-day window
-source('../StatStokes.R')
 #-------- # cos(hour angle) when it passes the given EL
 EL_HA <- function(sinEL, dec){
 	cosHA <- (sinEL - sin_phi* sin(dec)) / (cos_phi* cos(dec))
