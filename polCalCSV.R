@@ -3,8 +3,8 @@ library(RColorBrewer)
 library(plotly, warn.conflicts=FALSE)
 library(pandoc)
 library(htmlwidgets)   # multicore parallelization
-#eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
-source('../StatStokes.R')
+eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
+#source('../StatStokes.R')
 #-------- FE-specific PA
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
@@ -23,8 +23,10 @@ sin_phi <- sin(ALMA_LAT)
 maxSinEL <- sin(86/RADDEG)
 minSinEL <- sin(30/RADDEG)
 sessionDuration <- 1.0/hourPerRad	# at least 1 hour for session, in [rad]
-pointingDuration <- 0.1/hourPerRad	# 0.1 hourss in [rad]
+pointingDuration <- 0.2/hourPerRad	# 0.2 hour in [rad]
+etMargin <- 0.5/hourPerRad          # 0.5 hour margin to end the session, in [rad] 
 DateRange <- 60    # 60-day window
+Today <- Sys.time()
 #-------- # cos(hour angle) when it passes the given EL
 EL_HA <- function(sinEL, dec){
 	cosHA <- (sinEL - sin_phi* sin(dec)) / (cos_phi* cos(dec))
@@ -74,7 +76,7 @@ srcFreqCalibrator <- function(DF, band){
     for(src in sourceList){
         SDF <- DF[((DF$Src == src) & (DF$I < median(DF$I) + 3.0* sd(DF$I)) & (DF$P < median(DF$P) + 3.0* sd(DF$P))),]   # Filter reliable data
         if(nrow(SDF) < 3){ next }
-        srcDF[srcDF$Src == src,] <- estimateIQUV(SDF, BandFreq[band])
+        srcDF[srcDF$Src == src,] <- estimateIQUV(SDF, BandFreq[band], Today)
     }
     srcDF$RA  <- pi* (60.0* as.numeric(substring(sourceList, 2, 3)) + as.numeric(substring(sourceList, 4, 5))) / 720.0
     srcDF$DEC <- pi* sign(as.numeric(substring(sourceList, 6, 10)))* (as.numeric(substring(sourceList, 7, 8)) + as.numeric(substring(sourceList, 9, 10))/60.0) / 180.0
@@ -84,27 +86,32 @@ srcFreqCalibrator <- function(DF, band){
 HArange <- function(df, thresh, BPA){
     cos_dec <- cos(df$DEC); sin_dec <- sin(df$DEC)
     DF <- data.frame(matrix(rep(NA, 10), nrow=1)); colnames(DF) <- c('Src', 'I', 'P', 'EVPA', 'HA_start1', 'HA_start2', 'HA_end', 'LST_start1', 'LST_start2', 'LST_end')
-    DF$Src <- df$Src; DF$I <- df$I; DF$P <- df$P; DF$EVPA <- df$EVPA
+    #DF$Src <- df$Src; DF$I <- df$I; DF$P <- df$P; DF$EVPA <- df$EVPA
     HA <- seq(-df$ELHA, df$ELHA + HAresolution, by=HAresolution)  # Hour angle above EL limit
     sinHA <- sin(HA); cosHA <- cos(HA)
     PA <- atan2(sinHA, sin_phi*cos_dec/cos_phi - sin_dec*cosHA) + BPA   # Parallactic angle + BandPA
     calDF <- data.frame(HA=HA, PA=PA, XYcorr=df$U* cos(2.0*PA) - df$Q* sin(2.0*PA), et=NA)
     HA_intercepts <- HA[which(diff(sign(calDF$XYcorr)) != 0)]     # hour angles of sign transition
-    if(length(HA_intercepts) < 1){ return(na.omit(DF)) }
+    if(length(HA_intercepts) < 1){ return(na.omit(DF))}
     HA_XY <- calDF[abs(calDF$XYcorr) > thresh,]$HA
     if(length(HA_XY) < 1){ return(na.omit(DF)) }
     #-------- Plot XY vs LST
-    XYrange <- diff(range(calDF$XYcorr))
-	plot((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, type='l', col='darkgreen', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d as of %s', df$Src, band, as.character(Sys.Date())))
+    XYrange <- range(calDF$XYcorr); XYrange <- c(-0.1*XYrange[1]+1.1*XYrange[2], 1.1*XYrange[1]-0.1*XYrange[2])
+    LSTrange <- range((calDF$HA + df$RA)*hourPerRad); LSTrange <- c(-0.1*LSTrange[1]+1.1*LSTrange[2], 1.1*LSTrange[1]-0.1*LSTrange[2])
+	plot((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, type='n', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d as of %s', df$Src, band, as.character(Sys.Date())))
 	#grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
-	abline(h=thresh, lty=2, col='blue'); abline(h=-thresh, lty=2, col='blue'); abline(h=0.0, col='gray'); abline(v=hourPerRad* (HA_intercepts + df$RA))
+	#abline(h=thresh, lty=2, col='blue'); abline(h=-thresh, lty=2, col='blue')
+    polygon( c(LSTrange, rev(LSTrange)), c(-thresh, -thresh, XYrange[2], XYrange[2]), col='#FF000010', border=F)
+    polygon( c(LSTrange, rev(LSTrange)), c(thresh, thresh, XYrange[1], XYrange[1]), col='#FF000010', border=F)
+    abline(h=0.0, col='gray'); abline(v=hourPerRad* (HA_intercepts + df$RA))
+	lines((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, col='darkgreen', lwd=2)
     for(intercept in HA_intercepts){ text((intercept + df$RA)*hourPerRad, min(calDF$XYcorr), sprintf('%.1fh', (intercept + df$RA)*hourPerRad), pos=4, srt=90) }
     calDF <- calDF[calDF$HA < max(HA_intercepts) - pointingDuration,]          # start time must be before the last intercept
     #-------- HA range for |XY| > thresh
     indexRange <- which(abs(calDF$XYcorr) > thresh)
     for(intercept in sort(HA_intercepts, TRUE)){
         index <- which(calDF$HA[indexRange] < intercept - pointingDuration)
-        calDF$et[indexRange[index]] <- intercept 
+        calDF$et[indexRange[index]] <- intercept + etMargin
     }
     #-------- HA range for |XY| <= thresh12
     indexRange <- which(abs(calDF$XYcorr) <= thresh)
@@ -112,27 +119,27 @@ HArange <- function(df, thresh, BPA){
         threshCondition    <- which(HA_XY > calDF[index,]$HA)
         interceptCondition <- which(HA_intercepts > calDF[index,]$HA)
         if( length(threshCondition)* length(interceptCondition) > 0){
-            calDF[index,]$et <- max(HA_XY[min(threshCondition)], HA_intercepts[min(interceptCondition)])
+            calDF[index,]$et <- max(HA_XY[min(threshCondition)], HA_intercepts[min(interceptCondition)]) + etMargin
         }
     }
     calDF <- na.omit(calDF)
     #-------- Summarize LST range into DF
     etList <- unique(calDF$et); numWindow <- length(etList)
-    for(index in seq_along(etList)){
-        DF[index,] <- DF[1,]
-        DF$HA_start1[index] <- min(calDF$HA[which(calDF$et == etList[index])]) - HAresolution
-        DF$HA_start2[index] <- max(calDF$HA[which(calDF$et == etList[index])])
-        DF$HA_end[index]  <- etList[index]
+    DF <- data.frame(Src=rep(df$Src, numWindow), I=rep(df$I,numWindow), P=rep(df$P,numWindow), EVPA=rep(df$EVPA,numWindow), HA_start1=rep(NA,numWindow), HA_start2=rep(NA,numWindow), HA_end=etList)
+    for(index in 1:nrow(DF)){
+        DF[index,]$HA_start1 <- min(calDF[calDF$et == DF[index,]$HA_end,]$HA) - pointingDuration
+        DF[index,]$HA_start2 <- max(calDF[calDF$et == DF[index,]$HA_end,]$HA) - pointingDuration
+        DF[index,]$HA_end <- max(DF[index,]$HA_end, DF[index,]$HA_start2 + sessionDuration)
     }
     DF$LST_start1 <- DF$HA_start1 + df$RA
     DF$LST_start2 <- DF$HA_start2 + df$RA
-    DF$LST_end  <- DF$HA_end  + df$RA
+    DF$LST_end    <- DF$HA_end    + df$RA
     for(row_index in 1:numWindow){
-        window_vertical_offset <- 0.1*XYrange*(row_index-1)
+        window_vertical_offset <- 0.1*abs(diff(XYrange))*(row_index-1)
 	    lines(c(DF[row_index,]$LST_start1, DF[row_index,]$LST_start2)*hourPerRad, rep(window_vertical_offset,2), lwd=4, col='blue')
 	    lines(c(DF[row_index,]$LST_start2, DF[row_index,]$LST_end)*hourPerRad,  rep(window_vertical_offset,2), lwd=0.5, col='blue')
 	    lines(c(DF[row_index,]$LST_end, DF[row_index,]$LST_end + 0.25)*hourPerRad,  rep(window_vertical_offset,2), lwd=2, lty=2, col='blue')
-	    points(DF[row_index,]$LST_end*hourPerRad, window_vertical_offset, pch=18, cex=3, col='gray')
+	    points(DF[row_index,]$LST_end*hourPerRad, window_vertical_offset, pch=18, cex=2, col='#00000080')
         text(DF[row_index,]$LST_start1*hourPerRad, window_vertical_offset, sprintf('%.1fh', DF[row_index,]$LST_start1*hourPerRad), offset=1, pos=3, col='blue', srt=90)
         text(DF[row_index,]$LST_start2*hourPerRad, window_vertical_offset, sprintf('%.1fh', DF[row_index,]$LST_start2*hourPerRad), offset=1, pos=1, col='blue', srt=-90)
         text(DF[row_index,]$LST_end*hourPerRad, window_vertical_offset,  sprintf('%.1fh', DF[row_index,]$LST_end*hourPerRad), offset=1, pos=1, col='blue', srt=-90)
@@ -163,14 +170,10 @@ LSTfrag <- function(df){
 #FluxDataURL <- "https://www.alma.cl/~skameno/AMAPOLA/"
 #load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
 load("Flux.Rdata")     # Data frame of FLDF
-FLDF <- FLDF[as.Date(FLDF$Date) > Sys.Date() - DateRange,]  # Data frame within DateRange
+FLDF <- FLDF[as.Date(FLDF$Date) > as.Date(Today) - DateRange,]  # Data frame within DateRange
 #-------- Filter quasars
 FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]    # only quasars
-FLDF$relTime <- as.numeric(FLDF$Date) - as.numeric(as.POSIXct(Sys.time()))  # Relative second since now
 FLDF$P  <- sqrt(FLDF$Q^2 + FLDF$U^2)
-#FLDF$eP <- sqrt(FLDF$eQ^2 + FLDF$eU^2)
-#FLDF$EVPA  <- 0.5* atan2(FLDF$U, FLDF$Q)
-#FLDF$eEVPA <- 0.5* sqrt(FLDF$Q^2 * FLDF$eU^2 + FLDF$U^2 * FLDF$eQ^2) / (FLDF$P^2)
 sourceList <- sort(unique(FLDF$Src))
 FLDF$medP <- FLDF$freqRange <- numeric(nrow(FLDF))
 for(src in sourceList){ FLDF[FLDF$Src == src,]$medP <- median(FLDF[FLDF$Src == src,]$P)}
@@ -182,11 +185,11 @@ numSrc <- length(sourceList)
 #-------- Loop in frequency band
 for(band in seq(1, 7)){
     #-------- Today's IQUV
-    srcDF <- srcFreqCalibrator(FLDF, band)  # source properties (I, Q, U, V, P, EVPA) at the band
+    srcDF <- na.omit(srcFreqCalibrator(FLDF, band))  # source properties (I, Q, U, V, P, EVPA) at the band
     LST12DF <- na.omit(data.frame(matrix(rep(NA, 7), nrow=1))); names(LST12DF) <- c('Src', 'I', 'P', 'EVPA', 'LST_start1', 'LST_start2', 'LST_end') 
     LST7DF  <- na.omit(data.frame(matrix(rep(NA, 7), nrow=1))); names(LST7DF) <- c('Src', 'I', 'P', 'EVPA', 'LST_start1', 'LST_start2', 'LST_end') 
     #-------- XY-LST plot
-    plotDF <- plotLST(srcDF[srcDF$P - srcDF$eP > Pthresh12[band], ], band)
+    plotDF <- plotLST(na.omit(srcDF[srcDF$P - srcDF$eP > Pthresh12[band], ]), band)
     pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
     pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (60-day statistics)', band, as.character(Sys.Date())))
     htmlFile <- sprintf("Band%d_LSTplot.html", band)

@@ -1,6 +1,7 @@
 #-------- Estimate Stokes parameters by freqneyc and date 
-estimateIQUV <- function(DF, refFreq){
+estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     DF$relFreq <- DF$Freq / refFreq
+    DF$relTime <- as.numeric(DF$Date) - as.numeric(refDate)
     df <- subset(DF[,c('relFreq', 'I', 'eI', 'Q', 'eQ', 'U', 'eU', 'V', 'eV', 'relTime')], is.finite(relFreq) & is.finite(I) & is.finite(eI) & is.finite(relTime) & I > 0 & eI > 0 & relFreq > 0)
     df$P  <- sqrt(df$Q^2 + df$U^2)
     df$eP <- sqrt(df$eQ^2 + df$eU^2)
