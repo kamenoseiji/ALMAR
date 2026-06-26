@@ -101,8 +101,8 @@ HArange <- function(df, thresh, BPA){
 	plot((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, type='n', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d as of %s', df$Src, band, as.character(Sys.Date())))
 	#grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
 	#abline(h=thresh, lty=2, col='blue'); abline(h=-thresh, lty=2, col='blue')
-    polygon( c(LSTrange, rev(LSTrange)), c(-thresh, -thresh, XYrange[2], XYrange[2]), col='#FF000010', border=F)
-    polygon( c(LSTrange, rev(LSTrange)), c(thresh, thresh, XYrange[1], XYrange[1]), col='#FF000010', border=F)
+    polygon( c(LSTrange, rev(LSTrange)), c(-thresh, -thresh, XYrange[2], XYrange[2]), col='#FF000020', border=F)
+    polygon( c(LSTrange, rev(LSTrange)), c(thresh, thresh, XYrange[1], XYrange[1]), col='#FF000020', border=F)
     abline(h=0.0, col='gray'); abline(v=hourPerRad* (HA_intercepts + df$RA))
 	lines((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, col='darkgreen', lwd=2)
     for(intercept in HA_intercepts){ text((intercept + df$RA)*hourPerRad, min(calDF$XYcorr), sprintf('%.1fh', (intercept + df$RA)*hourPerRad), pos=4, srt=90) }
