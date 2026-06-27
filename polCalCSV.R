@@ -124,13 +124,17 @@ HArange <- function(df, thresh, BPA){
     }
     calDF <- na.omit(calDF)
     #-------- Summarize LST range into DF
-    etList <- unique(calDF$et); numWindow <- length(etList)
+    etList <- sort(unique(calDF$et)); numWindow <- length(etList)
     DF <- data.frame(Src=rep(df$Src, numWindow), I=rep(df$I,numWindow), P=rep(df$P,numWindow), EVPA=rep(df$EVPA,numWindow), HA_start1=rep(NA,numWindow), HA_start2=rep(NA,numWindow), HA_end=etList)
     for(index in 1:nrow(DF)){
         DF[index,]$HA_start1 <- min(calDF[calDF$et == DF[index,]$HA_end,]$HA) - pointingDuration
         DF[index,]$HA_start2 <- max(calDF[calDF$et == DF[index,]$HA_end,]$HA) - pointingDuration
         DF[index,]$HA_end <- max(DF[index,]$HA_end, DF[index,]$HA_start2 + sessionDuration)
     }
+	if(numWindow > 1){
+		DF <- DF[-diff(DF[order(DF$HA_start1),]$HA_start2) < 0,]
+		numWindow <- nrow(DF)
+	}
     DF$LST_start1 <- DF$HA_start1 + df$RA
     DF$LST_start2 <- DF$HA_start2 + df$RA
     DF$LST_end    <- DF$HA_end    + df$RA
@@ -214,10 +218,14 @@ for(band in seq(1, 7)){
     }
     LSTwindow12 <- LSTfrag(LST12DF)
     LSTwindow7  <- LSTfrag(LST7DF)
-    cat(sprintf('Band %d 12m array: %d sources\n', band, length(unique(LST12DF$Src))))
-    write.csv(LST12DF, sprintf('PolCal12mBand%d.csv', band), row.names=FALSE)
-    cat(sprintf('Band %d  7m array: %d sources\n', band, length(unique(LST7DF$Src))))
-    write.csv(LST7DF, sprintf('PolCal7mBand%d.csv', band), row.names=FALSE)
+	CSVdf <- data.frame(Src=LST12DF$Src, I=sprintf(' %7.4f', LST12DF$I), P=sprintf(' %7.4f', LST12DF$P), EVPA=sprintf(' %+7.4f', LST12DF$EVPA), LST_start1=sprintf('    %7.4f', hourPerRad*LST12DF$LST_start1), LST_start2=sprintf('    %7.4f', hourPerRad*LST12DF$LST_start2), LST_end=sprintf(' %7.4f', hourPerRad*LST12DF$LST_end))
+	names(CSVdf) <- c('Src       ', '  I     ', '  P     ', ' EVPA   ', ' LST_start1', ' LST_start2', ' LST_end')
+    cat(sprintf('Band %d 12m array: %d sources\n', band, length(unique(CSVdf$Src))))
+    write.csv(CSVdf, sprintf('PolCal12mBand%d.csv', band), row.names=FALSE, quote=FALSE)
+	CSVdf <- data.frame(Src=LST7DF$Src, I=sprintf(' %7.4f', LST7DF$I), P=sprintf(' %7.4f', LST7DF$P), EVPA=sprintf(' %+7.4f', LST7DF$EVPA), LST_start1=sprintf('    %7.4f', hourPerRad*LST7DF$LST_start1), LST_start2=sprintf('    %7.4f', hourPerRad*LST7DF$LST_start2), LST_end=sprintf(' %7.4f', hourPerRad*LST7DF$LST_end))
+	names(CSVdf) <- c('Src       ', '  I     ', '  P     ', ' EVPA   ', ' LST_start1', ' LST_start2', ' LST_end')
+    cat(sprintf('Band %d  7m array: %d sources\n', band, length(unique(CSVdf$Src))))
+    write.csv(CSVdf, sprintf('PolCal7mBand%d.csv', band), row.names=FALSE, quote=FALSE)
     #-------- Plot 
     uniqueCalibrators <- unique(LST12DF$Src)
 	pngFile <- sprintf('Band%d-LST.png', band)

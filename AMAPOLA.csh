@@ -12,6 +12,7 @@ cd WORK
 \ls -la *Flux.log | awk '{if ($5 >= 1024) print $9}' > fileList
 Rscript ../StokesFluxStat.R fileList
 Rscript ../polCalCSV.R
+Rscript ../../ALMAR_test/polCalCSVorg.R
 Rscript ../SSOUID.R
 Rscript ../ReadAeff.R fileList
 Rscript ../StokesText.R
@@ -26,7 +27,7 @@ cp Flux.Rdata AMAPOLA
 cp AeDF.Rdata AMAPOLA
 cp Dterm.Rdata AMAPOLA
 cp amapola.txt AMAPOLA
-cp PolCalBand*.csv AMAPOLA
+cp PolCal*.csv AMAPOLA
 cp *.png AMAPOLA/PNG
 cp *.pdf AMAPOLA/PDF
 mv *.table AMAPOLA/Table

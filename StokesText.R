@@ -1,3 +1,4 @@
+library(RCurl)
 library(RColorBrewer)
 library(dplyr)
 library(xtable)
@@ -6,6 +7,7 @@ library(pandoc)
 library(htmlwidgets)   # multicore parallelization
 library(parallel)   # multicore parallelization
 library(VGAM)       # for Rice distribution
+eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
 FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
 Sys.setenv(TZ="UTC")
 ALMA_lat <- -23.029 * pi / 180
