@@ -219,23 +219,25 @@ for(band in seq(1, 7)){
     }
     LSTwindow12 <- LSTfrag(LST12DF)
     LSTwindow7  <- LSTfrag(LST7DF)
+	#-------- HTML calibrator table for 12m array
     html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
     htmlFile <- sprintf('PolCal12m-Band%d.html', band)
     HTMLdf <- LST12DF
-    HTMLdf$Src <- paste('<a href="../PNG/', sprintf('%s-Band%d',LST12DF$Src, band), '-PA-12m.png" target="_new" > ',  LST12DF$Src,  ' </a>', sep='')
+    HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d',LST12DF$Src, band), '-PA-12m.png" target="_new" > ',  LST12DF$Src,  ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
-    CaptionText <- paste("<p>", sprintf('Band %d : as of %s', band, as.character(as.Date(Today))),sep='')
+    CaptionText <- paste("<p>", sprintf('12m-Array Band %d : as of %s', band, as.character(as.Date(Today))),sep='')
     html.body <- paste("<body>", CaptionText, html.table, "</body>")
     write(paste(html.head, html.body, sep='\n'), htmlFile)
+	#-------- HTML calibrator table for 7m array
     htmlFile <- sprintf('PolCal7m-Band%d.html', band)
-    HTMLdf <- LST12DF
-    HTMLdf$Src <- paste('<a href="../PNG/', sprintf('%s-Band%d',LST12DF$Src, band), '-PA-7m.png" target="_new" > ',  LST12DF$Src,  ' </a>', sep='')
+    HTMLdf <- LST7DF
+    HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d',LST7DF$Src, band), '-PA-7m.png" target="_new" > ',  LST7DF$Src,  ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
-    CaptionText <- paste("<p>", sprintf('Band %d : as of %s', band, as.character(as.Date(Today))),sep='')
+    CaptionText <- paste("<p>", sprintf('7m-Array Band %d : as of %s', band, as.character(as.Date(Today))),sep='')
     html.body <- paste("<body>", CaptionText, html.table, "</body>")
     write(paste(html.head, html.body, sep='\n'), htmlFile)
 	#CSVdf <- data.frame(Src=LST12DF$Src, I=sprintf(' %7.4f', LST12DF$I), P=sprintf(' %7.4f', LST12DF$P), EVPA=sprintf(' %+7.4f', LST12DF$EVPA), LST_start1=sprintf('    %7.4f', hourPerRad*LST12DF$LST_start1), LST_start2=sprintf('    %7.4f', hourPerRad*LST12DF$LST_start2), LST_end=sprintf(' %7.4f', hourPerRad*LST12DF$LST_end))

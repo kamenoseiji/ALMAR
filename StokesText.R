@@ -110,7 +110,7 @@ for(band in bandList){
     names(srcDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)', 'sd(EVPA)')
     srcDF$Source <- paste('<a href="', srcDF$Source, '.flux.html" target="_new" >', srcDF$Source, ' </a>', sep='')
     #-------- HTML pol-table
-    CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : %d-day median as of %s / ', BandFreq[band], DateRange, as.character(Today)),sep='')
+    CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : %d-day median as of %s / ', BandFreq[band], DateRange, as.character(as.Date(Today))),sep='')
 
     CaptionText <- paste(CaptionText, '<a href="', FluxDataURL, bandDF$File[lastObsIndex], '" target="_new">', 'Last Observation on ', as.character(bandDF$Date[lastObsIndex], tz='UTC'), "</p>", sep='')
     htmlFile <- sprintf('Stokes%.0fGHz.html', BandFreq[band])
