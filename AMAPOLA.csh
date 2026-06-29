@@ -12,7 +12,7 @@ cd WORK
 \ls -la *Flux.log | awk '{if ($5 >= 1024) print $9}' > fileList
 Rscript ../StokesFluxStat.R fileList
 Rscript ../polCalCSV.R
-Rscript ../../ALMAR_test/polCalCSVorg.R
+Rscript ../polCalCSVorg.R
 Rscript ../SSOUID.R
 Rscript ../ReadAeff.R fileList
 Rscript ../StokesText.R
