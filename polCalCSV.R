@@ -133,7 +133,8 @@ HArange <- function(df, thresh, BPA){
         DF[index,]$HA_end <- max(DF[index,]$HA_end, DF[index,]$HA_start2 + sessionDuration)
     }
 	if(numWindow > 1){
-		DF <- DF[-diff(DF[order(DF$HA_start1),]$HA_start2) < 0,]
+        DF <- DF[order(DF$HA_start1),]
+        DF[-diff(DF$HA_start2) < 0,]
 		numWindow <- nrow(DF)
 	}
     DF$LST_start1 <- DF$HA_start1 + df$RA

@@ -119,6 +119,7 @@ for(band in bandList){
     html.body <- paste("<body>", CaptionText, html.table, "</body>")
     write(paste(html.head, html.body, sep='\n'), htmlFile)
 }
+cat('Generaging AMAPOLA.pdf')
 pdf('AMAPOLA.pdf', width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
@@ -165,6 +166,7 @@ for(sourceName in sourceList){
 par(par.old)
 dev.off()
 #-------- Time-series HTML
+cat('Generaging HTML plots')
 bandList <- sort(unique(FLDF$Band))
 numFreq <- length(bandList)
 bandColor <- brewer.pal(numFreq, "Dark2")

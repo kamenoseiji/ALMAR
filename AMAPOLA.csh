@@ -3,8 +3,6 @@ cd WORK
 \rm *.Rdata
 \rm *.png
 \rm *.pdf
-\rm *.table
-\rm *.CSV
 \rm *.csv
 \rm *.html
 \rm -rf *_files
@@ -35,6 +33,5 @@ cp *.html AMAPOLA
 mv common.flux_files AMAPOLA
 mv J*.flux_files AMAPOLA
 mv Band*LSTplot_files AMAPOLA
-#rsync -a --safe-links --delete AMAPOLA skameno@ssh.alma.cl:/home/skameno/public_html/
 rsync -a --safe-links AMAPOLA skameno@ssh.alma.cl:/home/skameno/public_html/
 cd ..
