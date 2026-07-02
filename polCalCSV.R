@@ -189,6 +189,11 @@ FLDF <- FLDF[FLDF$freqRange > 100,]
 sourceList <- sort(unique(FLDF$Src))
 numSrc <- length(sourceList)
 #-------- Loop in frequency band
+html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
+DivTextHeadT <- '<div class="main-container">'
+DivTextHeadL <- '<div class="left-side">'
+DivTextHeadR <- '<div class="right-side">'
+DivTexEnd    <- '</div>'
 for(band in seq(1, 7)){
     #-------- Today's IQUV
     srcDF <- na.omit(srcFreqCalibrator(FLDF, band))  # source properties (I, Q, U, V, P, EVPA) at the band
@@ -221,34 +226,30 @@ for(band in seq(1, 7)){
     LSTwindow12 <- LSTfrag(LST12DF)
     LSTwindow7  <- LSTfrag(LST7DF)
 	#-------- HTML calibrator table for 12m array
-    html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
     htmlFile <- sprintf('PolCal12m-Band%d.html', band)
+	FrameText    <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST12DF[1,]$Src, band), '-PA-12m.png" name="plotimage-box" class="image-frame"></iframe>', sep='')
     HTMLdf <- LST12DF
-    HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d',LST12DF$Src, band), '-PA-12m.png" target="_new" > ',  LST12DF$Src,  ' </a>', sep='')
+    #HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d',LST12DF$Src, band), '-PA-12m.png" target="_new" > ',  LST12DF$Src,  ' </a>', sep='')
+	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST12DF$Src, band), '-PA-12m.png" target="plotimage-box"> ',  LST12DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
-    CaptionText <- paste("<p>", sprintf('12m-Array Band %d : as of %s', band, as.character(as.Date(Today))),sep='')
-    html.body <- paste("<body>", CaptionText, html.table, "</body>")
+    CaptionText <- paste("<p>", sprintf('12m-Array Band %d : as of %s', band, as.character(as.Date(Today))), '</p>', sep='')
+    html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
     write(paste(html.head, html.body, sep='\n'), htmlFile)
 	#-------- HTML calibrator table for 7m array
     htmlFile <- sprintf('PolCal7m-Band%d.html', band)
+	FrameText    <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST7DF[1,]$Src, band), '-PA-7m.png" name="plotimage-box" class="image-frame"></iframe>', sep='')
     HTMLdf <- LST7DF
-    HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d',LST7DF$Src, band), '-PA-7m.png" target="_new" > ',  LST7DF$Src,  ' </a>', sep='')
+    #HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d',LST7DF$Src, band), '-PA-7m.png" target="_new" > ',  LST7DF$Src,  ' </a>', sep='')
+	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST7DF$Src, band), '-PA-7m.png" target="plotimage-box"> ',  LST7DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
-    CaptionText <- paste("<p>", sprintf('7m-Array Band %d : as of %s', band, as.character(as.Date(Today))),sep='')
-    html.body <- paste("<body>", CaptionText, html.table, "</body>")
+    CaptionText <- paste('<p>', sprintf('7m-Array Band %d : as of %s', band, as.character(as.Date(Today))), '</p>', sep='')
+	#html.body <- paste("<body>", CaptionText, html.table, "</body>")
+	html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
     write(paste(html.head, html.body, sep='\n'), htmlFile)
-	#CSVdf <- data.frame(Src=LST12DF$Src, I=sprintf(' %7.4f', LST12DF$I), P=sprintf(' %7.4f', LST12DF$P), EVPA=sprintf(' %+7.4f', LST12DF$EVPA), LST_start1=sprintf('    %7.4f', hourPerRad*LST12DF$LST_start1), LST_start2=sprintf('    %7.4f', hourPerRad*LST12DF$LST_start2), LST_end=sprintf(' %7.4f', hourPerRad*LST12DF$LST_end))
-	#names(CSVdf) <- c('Src       ', '  I     ', '  P     ', ' EVPA   ', ' LST_start1', ' LST_start2', ' LST_end')
-    #cat(sprintf('Band %d 12m array: %d sources\n', band, length(unique(CSVdf$Src))))
-    #write.csv(CSVdf, sprintf('PolCal12mBand%d.csv', band), row.names=FALSE, quote=FALSE)
-	#CSVdf <- data.frame(Src=LST7DF$Src, I=sprintf(' %7.4f', LST7DF$I), P=sprintf(' %7.4f', LST7DF$P), EVPA=sprintf(' %+7.4f', LST7DF$EVPA), LST_start1=sprintf('    %7.4f', hourPerRad*LST7DF$LST_start1), LST_start2=sprintf('    %7.4f', hourPerRad*LST7DF$LST_start2), LST_end=sprintf(' %7.4f', hourPerRad*LST7DF$LST_end))
-	#names(CSVdf) <- c('Src       ', '  I     ', '  P     ', ' EVPA   ', ' LST_start1', ' LST_start2', ' LST_end')
-    #cat(sprintf('Band %d  7m array: %d sources\n', band, length(unique(CSVdf$Src))))
-    #write.csv(CSVdf, sprintf('PolCal7mBand%d.csv', band), row.names=FALSE, quote=FALSE)
     #-------- Plot 
     uniqueCalibrators <- unique(LST12DF$Src)
 	pngFile <- sprintf('Band%d-LST.png', band)
