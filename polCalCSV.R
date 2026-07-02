@@ -194,6 +194,7 @@ DivTextHeadT <- '<div class="main-container">'
 DivTextHeadL <- '<div class="left-side">'
 DivTextHeadR <- '<div class="right-side">'
 DivTexEnd    <- '</div>'
+DivTextHeadB <- paste('<h3>', 'Start the polarization session in the window between LST_start1 and LST_start2 (blue segment), and end it later than LST_end (dashed line with diamond head).', '</h3>', sep='')
 for(band in seq(1, 7)){
     #-------- Today's IQUV
     srcDF <- na.omit(srcFreqCalibrator(FLDF, band))  # source properties (I, Q, U, V, P, EVPA) at the band
@@ -227,28 +228,25 @@ for(band in seq(1, 7)){
     LSTwindow7  <- LSTfrag(LST7DF)
 	#-------- HTML calibrator table for 12m array
     htmlFile <- sprintf('PolCal12m-Band%d.html', band)
-	FrameText    <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST12DF[1,]$Src, band), '-PA-12m.png" name="plotimage-box" class="image-frame"></iframe>', sep='')
+	FrameText <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST12DF[1,]$Src, band), '-PA-12m.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>', sep='')
     HTMLdf <- LST12DF
-    #HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d',LST12DF$Src, band), '-PA-12m.png" target="_new" > ',  LST12DF$Src,  ' </a>', sep='')
 	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST12DF$Src, band), '-PA-12m.png" target="plotimage-box"> ',  LST12DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
     CaptionText <- paste("<p>", sprintf('12m-Array Band %d : as of %s', band, as.character(as.Date(Today))), '</p>', sep='')
-    html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
+    html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, DivTextHeadB, FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
     write(paste(html.head, html.body, sep='\n'), htmlFile)
 	#-------- HTML calibrator table for 7m array
     htmlFile <- sprintf('PolCal7m-Band%d.html', band)
-	FrameText    <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST7DF[1,]$Src, band), '-PA-7m.png" name="plotimage-box" class="image-frame"></iframe>', sep='')
+	FrameText <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST7DF[1,]$Src, band), '-PA-7m.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>', sep='')
     HTMLdf <- LST7DF
-    #HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d',LST7DF$Src, band), '-PA-7m.png" target="_new" > ',  LST7DF$Src,  ' </a>', sep='')
 	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST7DF$Src, band), '-PA-7m.png" target="plotimage-box"> ',  LST7DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
     CaptionText <- paste('<p>', sprintf('7m-Array Band %d : as of %s', band, as.character(as.Date(Today))), '</p>', sep='')
-	#html.body <- paste("<body>", CaptionText, html.table, "</body>")
-	html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
+	html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, DivTextHeadB, FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
     write(paste(html.head, html.body, sep='\n'), htmlFile)
     #-------- Plot 
     uniqueCalibrators <- unique(LST12DF$Src)
