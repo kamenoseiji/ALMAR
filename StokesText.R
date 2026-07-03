@@ -8,6 +8,7 @@ library(htmlwidgets)   # multicore parallelization
 library(parallel)   # multicore parallelization
 library(VGAM)       # for Rice distribution
 eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
+#source('../StatStokes.R')
 FluxDataURL <- "https://www.alma.cl/~skameno/Grid/Stokes/"
 Sys.setenv(TZ="UTC")
 ALMA_lat <- -23.029 * pi / 180
@@ -30,21 +31,21 @@ getBand <- function(fileName){
     return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
 }
 #-------- Input multiple frequency data and output Stokes parameters at the standard frequency
-predStokes <- function(df){
-    bandID   <- df$Band[1]
-    fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/eI^2)
-    fitQ <- lm(formula=Q ~ Freq, data=df, weight=1.0/eQ^2)
-    fitU <- lm(formula=U ~ Freq, data=df, weight=1.0/eU^2)
-    fitV <- lm(formula=V ~ Freq, data=df, weight=1.0/eV^2)
-    newDF <- data.frame(Src=df$Src[1], Freq = standardFreq[[bandID]], EL=df$EL[1])
-    pred <- as.numeric(predict(fitI, newDF, interval='confidence', level=0.67)); newDF$I <- matrix(pred, ncol=3)[,1]; newDF$eI <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
-    pred <- as.numeric(predict(fitQ, newDF, interval='confidence', level=0.67)); newDF$Q <- matrix(pred, ncol=3)[,1]; newDF$eQ <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
-    pred <- as.numeric(predict(fitU, newDF, interval='confidence', level=0.67)); newDF$U <- matrix(pred, ncol=3)[,1]; newDF$eU <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
-    pred <- as.numeric(predict(fitV, newDF, interval='confidence', level=0.67)); newDF$V <- matrix(pred, ncol=3)[,1]; newDF$eV <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
-    newDF$Date <- df$Date[1]
-    newDF$File <- df$File[1]
-    return(newDF)
-}
+#predStokes <- function(df){
+#    bandID   <- df$Band[1]
+#    fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/eI^2)
+#    fitQ <- lm(formula=Q ~ Freq, data=df, weight=1.0/eQ^2)
+#    fitU <- lm(formula=U ~ Freq, data=df, weight=1.0/eU^2)
+#    fitV <- lm(formula=V ~ Freq, data=df, weight=1.0/eV^2)
+#    newDF <- data.frame(Src=df$Src[1], Freq = standardFreq[[bandID]], EL=df$EL[1])
+#    pred <- as.numeric(predict(fitI, newDF, interval='confidence', level=0.67)); newDF$I <- matrix(pred, ncol=3)[,1]; newDF$eI <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+#    pred <- as.numeric(predict(fitQ, newDF, interval='confidence', level=0.67)); newDF$Q <- matrix(pred, ncol=3)[,1]; newDF$eQ <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+#    pred <- as.numeric(predict(fitU, newDF, interval='confidence', level=0.67)); newDF$U <- matrix(pred, ncol=3)[,1]; newDF$eU <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+#    pred <- as.numeric(predict(fitV, newDF, interval='confidence', level=0.67)); newDF$V <- matrix(pred, ncol=3)[,1]; newDF$eV <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
+#    newDF$Date <- df$Date[1]
+#    newDF$File <- df$File[1]
+#    return(newDF)
+#}
 #-------- Text Formatting
 textResult <- function(entry){
     text_sd <- sprintf()
@@ -77,6 +78,7 @@ sigmaSQ <- sqrt(textDF$eQ * textDF$eU + (textDF$I* sysPerr)^2)
 textDF$eP_lower <- qrice(0.15, sigmaSQ, textDF$P)
 textDF[textDF$P < sigmaSQ,]$eP_lower <- 0.0
 textDF$eP_upper <- qrice(0.85, sigmaSQ, textDF$P)
+textDF <- textDF[textDF$eP_upper < textDF$I,]
 textDF$EVPA <- 0.5* atan2(textDF$U, textDF$Q)
 textDF$eEVPA <- 0.5* sqrt(textDF$Q^2 * textDF$eU^2 + textDF$U^2 * textDF$eQ^2) / (textDF$P)^2
 #---- Output to text data
@@ -89,17 +91,34 @@ textDF$Band <- getBand(textDF$File)
 textDF$Src <- trimws(textDF$Src)
 #-------- HTML table of source flux
 recentDF <- textDF[as.Date(Today) - as.Date(textDF$Date) < DateRange,]   # Recent 60 days
+recentDF$relTime <- as.numeric(recentDF$Date) - as.numeric(Sys.time())
 bandList <- sort(unique(recentDF$Band))
 for(band in bandList){
     bandDF <- recentDF[recentDF$Band == band,]
     lastObsIndex <- order(bandDF$Date, decreasing=TRUE)[1]
     sourceList <- unique(bandDF$Src)
+    for(source in sourceList){ if(nrow(bandDF[bandDF$Src == source,]) < 4){ bandDF <- bandDF[bandDF$Src != source,]}}
+    sourceList <- unique(bandDF$Src)
     sourceList <- sourceList[grep('^J[0-9]',sourceList)]
+    if(length(sourceList) < 1){ next }
     srcDF <- mclapply(sourceList, function(source){
         DF <- bandDF[bandDF$Src == source, ]
-        return(data.frame(Src=source, numObs = nrow(DF), I = median(DF$I), eI = sd(DF$I), Q = median(DF$Q), eQ = sd(DF$Q), U = median(DF$U), eU=sd(DF$U)))
+        return(data.frame(
+            Src=source,
+            numObs = nrow(DF),
+            I = SPfit(data.frame(relTime = DF$relTime, Value=DF$I, error=DF$eI)),
+            Q = SPfit(data.frame(relTime = DF$relTime, Value=DF$Q, error=DF$eQ)),
+            U = SPfit(data.frame(relTime = DF$relTime, Value=DF$U, error=DF$eU))))
     }, mc.cores=numCore)
     srcDF <- na.omit(bind_rows(srcDF))
+    srcDF$eI <- Im(srcDF$I); srcDF$eQ <- Im(srcDF$Q); srcDF$eU <- Im(srcDF$U) 
+    srcDF$I  <- Re(srcDF$I); srcDF$Q  <- Re(srcDF$Q); srcDF$U  <- Re(srcDF$U) 
+    srcDF <- srcDF[,c(1,2,3,6,4,7,5,8)]
+    #srcDF <- mclapply(sourceList, function(source){
+    #    DF <- bandDF[bandDF$Src == source, ]
+    #    return(data.frame(Src=source, numObs = nrow(DF), I = median(DF$I), eI = sd(DF$I), Q = median(DF$Q), eQ = sd(DF$Q), U = median(DF$U), eU=sd(DF$U)))
+    #}, mc.cores=numCore)
+    #srcDF <- na.omit(bind_rows(srcDF))
     if(nrow(srcDF) == 0){next}
     srcDF$P  <- sqrt(srcDF$Q^2 + srcDF$U^2)
     srcDF$eP <- sqrt(srcDF$eQ^2 + srcDF$eU^2)
@@ -107,11 +126,10 @@ for(band in bandList){
     srcDF$EVPA  <- 90*atan2(srcDF$U, srcDF$Q)/pi
     srcDF$eEVPA <- 90*sqrt(srcDF$Q^2 * srcDF$eU^2 + srcDF$U^2 * srcDF$eQ^2) / (srcDF$P)^2 / pi
     srcDF <- srcDF[order(srcDF$P, decreasing=TRUE),]
-    names(srcDF) <- c('Source', '#obs', 'I [Jy]', 'sd(I)', 'Q [Jy]', 'sd(Q)', 'U [Jy]', 'sd(U)', 'P [Jy]', 'sd(P)', '%pol', 'EVPA (deg)', 'sd(EVPA)')
+    names(srcDF) <- c('Source', '#obs', 'I [Jy]', 'e(I)', 'Q [Jy]', 'e(Q)', 'U [Jy]', 'e(U)', 'P [Jy]', 'e(P)', '%pol', 'EVPA (deg)', 'e(EVPA)')
     srcDF$Source <- paste('<a href="', srcDF$Source, '.flux.html" target="_new" >', srcDF$Source, ' </a>', sep='')
     #-------- HTML pol-table
-    CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : %d-day median as of %s / ', BandFreq[band], DateRange, as.character(as.Date(Today))),sep='')
-
+    CaptionText <- paste("<p>", sprintf('Frequency %.1f GHz : %d-day propagation on %s / ', BandFreq[band], DateRange, as.character(as.Date(Today))),sep='')
     CaptionText <- paste(CaptionText, '<a href="', FluxDataURL, bandDF$File[lastObsIndex], '" target="_new">', 'Last Observation on ', as.character(bandDF$Date[lastObsIndex], tz='UTC'), "</p>", sep='')
     htmlFile <- sprintf('Stokes%.0fGHz.html', BandFreq[band])
     html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')

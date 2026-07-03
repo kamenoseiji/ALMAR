@@ -194,12 +194,12 @@ for(band in seq(1, 7)){
     #-------- Today's IQUV
     srcDF <- srcFreqCalibrator(FLDF, band)  # source properties (I, Q, U, V, P, EVPA) at the band
     #-------- XY-LST plot
-    plotDF <- plotLST(srcDF[srcDF$P - srcDF$eP > Pthresh12[band], ], band)
-    pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
-    pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (60-day statistics)', band, as.character(Sys.Date())))
-    htmlFile <- sprintf("Band%d_LSTplot.html", band)
-    htmlwidgets::saveWidget(pLST, htmlFile, selfcontained=FALSE)
-    rm(plotDF)
+    #plotDF <- plotLST(srcDF[srcDF$P - srcDF$eP > Pthresh12[band], ], band)
+    #pLST <- plot_ly(data=plotDF, x = ~LST, y = ~XYcorr, type = 'scatter', mode = 'lines', color=~Src, hoverinfo='text', text=~paste(Src, 'EL=',floor(EL)))
+    #pLST <- layout(pLST, xaxis=list(showgrid=T, title='LST', nticks=24), yaxis=list(showgrid=T, title='XY correlation [Jy]',rangemode='tozero'), title=sprintf('Band-%d Pol-Calibrator Coverage as of %s (60-day statistics)', band, as.character(Sys.Date())))
+    #htmlFile <- sprintf("Band%d_LSTplot.html", band)
+    #htmlwidgets::saveWidget(pLST, htmlFile, selfcontained=FALSE)
+    #rm(plotDF)
     #-------- Calculate HA and LST windows
     srcDF <- srcDF[(srcDF$P - srcDF$eP) / (srcDF$I + srcDF$eI) > mthresh,]  # filter by polarization degree
     srcDF <- srcDF[srcDF$P - srcDF$eP > Pthresh12[band],]  # filter by polarized flux

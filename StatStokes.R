@@ -47,39 +47,9 @@ predStokes <- function(df){
     newDF$File <- df$File[1]
     return(newDF)
 }
-#library(KFAS)
-#KalmanIQUV <- function(DF, refFreq){
-#    #-------- Kalman filtering for Stokes I and spectral index
-#    datI <- subset(DF[,c("relFreq", "I", "eI", "relTime")], is.finite(relFreq) & is.finite(I) & is.finite(eI) & is.finite(relTime) & I > 0 & eI > 0 & relFreq > 0)
-#    #-------- Observation equation : logI = log(I)
-#    datI$logI <- log(datI$I); datI$var_logI <- (datI$eI / datI$I)^2
-#    #-------- Build state-space model : State vector: a_t = [beta0_t, beta1_t], Observation: y_t = [1, log(Freq_t)] a_t + eps_t
-#    Z_array <- array(NA_real_, dim = c(1, 2, nrow(datI)))
-#    Z_array[1,1,] <- 1
-#    Z_array[1,2,] <- log(datI$relFreq)
-#    #-------- Random-walk state evolution
-#    build_model <- function(log_q0, log_q1) {
-#        Qmat <- diag(c(exp(log_q0), exp(log_q1)))
-#        SSModel( datI$logI ~ -1 + SSMcustom(Z = Z_array, T = diag(2), R = diag(2), Q = Qmat, a1 = c(mean(datI$logI), 0), P1 = diag(1e6, 2)), H = array(datI$var_logI, c(1,1,nrow(datI))))
-#    }
-#    #-------- Maximum likelihood estimation of state variances
-#    init_par <- log(c( var(datI$logI, na.rm = TRUE) * 1e-3, 1e-3))
-#    fit <- fitSSM( inits = init_par, model = build_model(init_par[1], init_par[2]), updatefn = function(pars, model) {
-#            model$Q[,,1] <- diag(exp(pars))
-#            model }, method = "BFGS")
-#    model_fit <- fit$model
-#    #-------- Kalman smoothing
-#    kfs <- KFS( model_fit, smoothing = c("state", "signal"))
-#    #-------- Estimate state at t = 0
-#    beta_hat <- kfs$alphahat
-#    last_state <- beta_hat[nrow(datI), ]
-#    V_last <- kfs$V[,,nrow(datI)] # State covariance at final epoch
-#    V0 <- V_last
-#    beta0_now <- last_state[1]
-#    alpha_now <- last_state[2]
-#    se_beta0_now <- sqrt(V0[1,1]) 
-#    se_alpha_now <- sqrt(V0[2,2])
-#    S_now <- exp(beta0_now)
-#    se_S_now <- S_now * se_beta0_now
-#    return(c(S_now, se_S_now, alpha_now, se_alpha_now))
-#}
+#-------- Input multiple frequency data and output Stokes parameters at the standard frequency
+SPfit <- function(df){
+    df <- rbind(df, c(abs(df[1,]$relTime), median(df$Value), sum(df$error))) # terminal value to avoid divergence
+    sp <- smooth.spline(df$Value ~ df$relTime, w=1/df$error^2, spar=0.9, cv=TRUE)
+    return( predict(sp, 0.0, se.fit=TRUE)$y + (0.0 + 1.0i)*sqrt(sp$cv.crit) )
+}
