@@ -1,3 +1,4 @@
+library(mgcv)
 #-------- Estimate Stokes parameters by frequency and date 
 estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     DF$relFreq <- DF$Freq / refFreq
@@ -49,7 +50,8 @@ predStokes <- function(df){
 }
 #-------- Input multiple frequency data and output Stokes parameters at the standard frequency
 SPfit <- function(df){
-    df <- rbind(df, c(abs(df[1,]$relTime), median(df$Value), sum(df$error))) # terminal value to avoid divergence
-    sp <- smooth.spline(df$Value ~ df$relTime, w=1/df$error^2, spar=0.9, cv=TRUE)
-    return( predict(sp, 0.0, se.fit=TRUE)$y + (0.0 + 1.0i)*sqrt(sp$cv.crit) )
+    df <- rbind(df, data.frame(relTime=abs(df[1,]$relTime)*seq(0.5, 1.4, by=0.1), Value=rep(median(df$Value), 10), error=rep(sum(df$error), 10)))
+    gam_model <- gam(Value ~ s(relTime, bs="cr"), data=df, weights=1/error^2, sp=0.3*abs(df[1,]$relTime))
+    pred_gam <- predict(gam_model, newdata=data.frame(relTime=0.0), se.fit=TRUE)
+    return( pred_gam$fit  + (0.0 + 1.0i)*pred_gam$se.fit )
 }

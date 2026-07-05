@@ -15,7 +15,6 @@ ALMA_lat <- -23.029 * pi / 180
 Today <- Sys.time()
 DateRange <- 60        # Statistics for recent 60 days
 SECPERDAY <- 86400
-#sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
 minAntNum <- 5		   # Minimum number of antennas
 standardFreq <- list(40.0, 80.0, c(91.5,97.5,103.5), 154.9, 183.0, 233.0, 343.4, 410.2)
@@ -30,22 +29,6 @@ getBand <- function(fileName){
     bandPointer <- regexpr("RB_[0-10]", fileName)
     return(as.integer(substr(fileName, bandPointer+3, bandPointer+4)))
 }
-#-------- Input multiple frequency data and output Stokes parameters at the standard frequency
-#predStokes <- function(df){
-#    bandID   <- df$Band[1]
-#    fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/eI^2)
-#    fitQ <- lm(formula=Q ~ Freq, data=df, weight=1.0/eQ^2)
-#    fitU <- lm(formula=U ~ Freq, data=df, weight=1.0/eU^2)
-#    fitV <- lm(formula=V ~ Freq, data=df, weight=1.0/eV^2)
-#    newDF <- data.frame(Src=df$Src[1], Freq = standardFreq[[bandID]], EL=df$EL[1])
-#    pred <- as.numeric(predict(fitI, newDF, interval='confidence', level=0.67)); newDF$I <- matrix(pred, ncol=3)[,1]; newDF$eI <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
-#    pred <- as.numeric(predict(fitQ, newDF, interval='confidence', level=0.67)); newDF$Q <- matrix(pred, ncol=3)[,1]; newDF$eQ <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
-#    pred <- as.numeric(predict(fitU, newDF, interval='confidence', level=0.67)); newDF$U <- matrix(pred, ncol=3)[,1]; newDF$eU <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
-#    pred <- as.numeric(predict(fitV, newDF, interval='confidence', level=0.67)); newDF$V <- matrix(pred, ncol=3)[,1]; newDF$eV <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
-#    newDF$Date <- df$Date[1]
-#    newDF$File <- df$File[1]
-#    return(newDF)
-#}
 #-------- Text Formatting
 textResult <- function(entry){
     text_sd <- sprintf()
@@ -94,13 +77,14 @@ recentDF <- textDF[as.Date(Today) - as.Date(textDF$Date) < DateRange,]   # Recen
 recentDF$relTime <- as.numeric(recentDF$Date) - as.numeric(Sys.time())
 bandList <- sort(unique(recentDF$Band))
 for(band in bandList){
+    cat(sprintf('--- Calibrator List Band %d\n', band))
     bandDF <- recentDF[recentDF$Band == band,]
-    lastObsIndex <- order(bandDF$Date, decreasing=TRUE)[1]
     sourceList <- unique(bandDF$Src)
-    for(source in sourceList){ if(nrow(bandDF[bandDF$Src == source,]) < 4){ bandDF <- bandDF[bandDF$Src != source,]}}
+    for(source in sourceList){ if( diff(range(bandDF[bandDF$Src == source,]$relTime)) < 0.5*DateRange*SECPERDAY ){ bandDF <- bandDF[bandDF$Src != source,]}}
     sourceList <- unique(bandDF$Src)
     sourceList <- sourceList[grep('^J[0-9]',sourceList)]
     if(length(sourceList) < 1){ next }
+    lastObsIndex <- order(bandDF$Date, decreasing=TRUE)[1]
     srcDF <- mclapply(sourceList, function(source){
         DF <- bandDF[bandDF$Src == source, ]
         return(data.frame(
@@ -114,11 +98,6 @@ for(band in bandList){
     srcDF$eI <- Im(srcDF$I); srcDF$eQ <- Im(srcDF$Q); srcDF$eU <- Im(srcDF$U) 
     srcDF$I  <- Re(srcDF$I); srcDF$Q  <- Re(srcDF$Q); srcDF$U  <- Re(srcDF$U) 
     srcDF <- srcDF[,c(1,2,3,6,4,7,5,8)]
-    #srcDF <- mclapply(sourceList, function(source){
-    #    DF <- bandDF[bandDF$Src == source, ]
-    #    return(data.frame(Src=source, numObs = nrow(DF), I = median(DF$I), eI = sd(DF$I), Q = median(DF$Q), eQ = sd(DF$Q), U = median(DF$U), eU=sd(DF$U)))
-    #}, mc.cores=numCore)
-    #srcDF <- na.omit(bind_rows(srcDF))
     if(nrow(srcDF) == 0){next}
     srcDF$P  <- sqrt(srcDF$Q^2 + srcDF$U^2)
     srcDF$eP <- sqrt(srcDF$eQ^2 + srcDF$eU^2)
@@ -137,7 +116,7 @@ for(band in bandList){
     html.body <- paste("<body>", CaptionText, html.table, "</body>")
     write(paste(html.head, html.body, sep='\n'), htmlFile)
 }
-cat('Generaging AMAPOLA.pdf')
+cat('Generaging AMAPOLA.pdf\n')
 pdf('AMAPOLA.pdf', width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
@@ -184,7 +163,7 @@ for(sourceName in sourceList){
 par(par.old)
 dev.off()
 #-------- Time-series HTML
-cat('Generaging HTML plots')
+cat('Generaging HTML plots\n')
 bandList <- sort(unique(FLDF$Band))
 numFreq <- length(bandList)
 bandColor <- brewer.pal(numFreq, "Dark2")
