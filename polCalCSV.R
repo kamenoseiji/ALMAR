@@ -69,20 +69,6 @@ plotLST <- function(DF, band){
     }
     return(pDF)
 }
-#-------- Filter calibrators for band
-srcFreqCalibrator <- function(DF, band){
-    sourceList <- sort(unique(DF$Src))
-    numSrc <- length(sourceList)
-    srcDF <- data.frame(Src=sourceList, I=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), V=numeric(numSrc), P=numeric(numSrc), EVPA=numeric(numSrc), eI=numeric(numSrc), eQ=numeric(numSrc), eU=numeric(numSrc), eV=numeric(numSrc), eP=numeric(numSrc), eEVPA=numeric(numSrc))
-    for(src in sourceList){
-        SDF <- DF[((DF$Src == src) & (DF$I < median(DF$I) + 3.0* sd(DF$I)) & (DF$P < median(DF$P) + 3.0* sd(DF$P))),]   # Filter reliable data
-        if(nrow(SDF) < 3){ next }
-        srcDF[srcDF$Src == src,] <- estimateIQUV(SDF, BandFreq[band], Today)
-    }
-    srcDF$RA  <- pi* (60.0* as.numeric(substring(sourceList, 2, 3)) + as.numeric(substring(sourceList, 4, 5))) / 720.0
-    srcDF$DEC <- pi* sign(as.numeric(substring(sourceList, 6, 10)))* (as.numeric(substring(sourceList, 7, 8)) + as.numeric(substring(sourceList, 9, 10))/60.0) / 180.0
-    return( srcDF[((srcDF$P - srcDF$eP > Pthresh12[band]) & ((srcDF$P - srcDF$eP)/(srcDF$I + srcDF$eI) > 0.03)),] )     # Filter by polarized flux and polarization degree
-}
 #-------- HA range over threshold
 HArange <- function(df, thresh, BPA){
     cos_dec <- cos(df$DEC); sin_dec <- sin(df$DEC)
@@ -100,8 +86,6 @@ HArange <- function(df, thresh, BPA){
     XYrange <- range(calDF$XYcorr); XYrange <- c(-0.1*XYrange[1]+1.1*XYrange[2], 1.1*XYrange[1]-0.1*XYrange[2])
     LSTrange <- range((calDF$HA + df$RA)*hourPerRad); LSTrange <- c(-0.1*LSTrange[1]+1.1*LSTrange[2], 1.1*LSTrange[1]-0.1*LSTrange[2])
 	plot((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, type='n', xlab='LST [h]', ylab='XY correlation [Jy]', main=sprintf('%s Band%d as of %s', df$Src, band, as.character(Sys.Date())))
-	#grid(nx=NULL, ny=NULL, lty=2, col='gray', lwd=1)
-	#abline(h=thresh, lty=2, col='blue'); abline(h=-thresh, lty=2, col='blue')
     polygon( c(LSTrange, rev(LSTrange)), c(-thresh, -thresh, XYrange[2], XYrange[2]), col='#FF000020', border=F)
     polygon( c(LSTrange, rev(LSTrange)), c(thresh, thresh, XYrange[1], XYrange[1]), col='#FF000020', border=F)
     abline(h=0.0, col='gray'); abline(v=hourPerRad* (HA_intercepts + df$RA))
@@ -172,22 +156,6 @@ LSTfrag <- function(df){
     LSTfrag[1] <- LSTfrag[length(LSTfrag)] <- 1
     return(data.frame(LSTbegin = LSTrange[which(diff(LSTfrag) == -1)], LSTend=LSTrange[which(diff(LSTfrag) == 1)]))
 }
-#-------- Load Flux.Rdata from web
-#FluxDataURL <- "https://www.alma.cl/~skameno/AMAPOLA/"
-#load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
-load("Flux.Rdata")     # Data frame of FLDF
-FLDF <- FLDF[as.Date(FLDF$Date) > as.Date(Today) - DateRange,]  # Data frame within DateRange
-#-------- Filter quasars
-FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]    # only quasars
-FLDF$P  <- sqrt(FLDF$Q^2 + FLDF$U^2)
-sourceList <- sort(unique(FLDF$Src))
-FLDF$medP <- FLDF$freqRange <- numeric(nrow(FLDF))
-for(src in sourceList){ FLDF[FLDF$Src == src,]$medP <- median(FLDF[FLDF$Src == src,]$P)}
-for(src in sourceList){ FLDF[FLDF$Src == src,]$freqRange <- diff(range(FLDF[FLDF$Src == src,]$Freq))}
-FLDF <- FLDF[FLDF$medP > 0.03,]
-FLDF <- FLDF[FLDF$freqRange > 100,]
-sourceList <- sort(unique(FLDF$Src))
-numSrc <- length(sourceList)
 #-------- Loop in frequency band
 html.head <- paste("<head>", '<link rel="stylesheet" type="text/css" href="https://www.alma.cl/~skameno/resources/amapola.css" />', "</head>", sep='\n')
 DivTextHeadT <- '<div class="main-container">'
@@ -195,9 +163,13 @@ DivTextHeadL <- '<div class="left-side">'
 DivTextHeadR <- '<div class="right-side">'
 DivTexEnd    <- '</div>'
 DivTextHeadB <- paste('<h3>', 'Start the polarization session in the window between LST_start1 and LST_start2 (blue segment), and end it later than LST_end (dashed line with diamond head).', '</h3>', sep='')
+DivTextHeadC <- paste('<p><ul><li>', 'Green curve : expected cross-polarization [Jy]', '</li>', sep='')
+DivTextHeadD <- paste('<li>', 'Pink bands : Thresholds for cross-polarization', '</li>', sep='')
+DivTextHeadE <- paste('<li>', 'Blue thick segments : LST windows to start a polarization session', '</li>', sep='')
+DivTextHeadF <- paste('<li>', 'Diamonds followed by dashed lines : Earliest LST to end the session', '</li></ul></p>', sep='')
 for(band in seq(1, 7)){
     #-------- Today's IQUV
-    srcDF <- na.omit(srcFreqCalibrator(FLDF, band))  # source properties (I, Q, U, V, P, EVPA) at the band
+    load(sprintf('PolCalBand%d.Rdata', band))
     LST12DF <- na.omit(data.frame(matrix(rep(NA, 7), nrow=1))); names(LST12DF) <- c('Src', 'I', 'P', 'EVPA', 'LST_start1', 'LST_start2', 'LST_end') 
     LST7DF  <- na.omit(data.frame(matrix(rep(NA, 7), nrow=1))); names(LST7DF) <- c('Src', 'I', 'P', 'EVPA', 'LST_start1', 'LST_start2', 'LST_end') 
     #-------- XY-LST plot
@@ -228,25 +200,27 @@ for(band in seq(1, 7)){
     LSTwindow7  <- LSTfrag(LST7DF)
 	#-------- HTML calibrator table for 12m array
     htmlFile <- sprintf('PolCal12m-Band%d.html', band)
-	FrameText <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST12DF[1,]$Src, band), '-PA-12m.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>', sep='')
+	#FrameText <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST12DF[1,]$Src, band), '-PA-12m.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>', sep='')
+	FrameText <- '<iframe src="images/defaultLST.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>'
     HTMLdf <- LST12DF
 	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST12DF$Src, band), '-PA-12m.png" target="plotimage-box"> ',  LST12DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
     CaptionText <- paste("<p>", sprintf('12m-Array Band %d : as of %s', band, as.character(as.Date(Today))), '</p>', sep='')
-    html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, DivTextHeadB, FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
+    html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, DivTextHeadB, DivTextHeadC,DivTextHeadD,DivTextHeadE,DivTextHeadF,FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
     write(paste(html.head, html.body, sep='\n'), htmlFile)
 	#-------- HTML calibrator table for 7m array
     htmlFile <- sprintf('PolCal7m-Band%d.html', band)
-	FrameText <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST7DF[1,]$Src, band), '-PA-7m.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>', sep='')
+	#FrameText <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST7DF[1,]$Src, band), '-PA-7m.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>', sep='')
+	FrameText <- '<iframe src="images/defaultLST.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>'
     HTMLdf <- LST7DF
 	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST7DF$Src, band), '-PA-7m.png" target="plotimage-box"> ',  LST7DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
     CaptionText <- paste('<p>', sprintf('7m-Array Band %d : as of %s', band, as.character(as.Date(Today))), '</p>', sep='')
-	html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, DivTextHeadB, FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
+    html.body <- paste("<body>", CaptionText, DivTextHeadT, DivTextHeadL, html.table, DivTexEnd, DivTextHeadR, DivTextHeadB, DivTextHeadC,DivTextHeadD,DivTextHeadE,DivTextHeadF,FrameText, DivTexEnd, DivTexEnd, "</body>", sep='\n')
     write(paste(html.head, html.body, sep='\n'), htmlFile)
     #-------- Plot 
     uniqueCalibrators <- unique(LST12DF$Src)
@@ -260,7 +234,6 @@ for(band in seq(1, 7)){
         text(0.5*hourPerRad*(LSTwindow7$LSTbegin[index] + LSTwindow7$LSTend[index]), -0.5, text_sd, cex=2, col='darkgreen')
     }
     grid(nx=24, ny=0, lwd=0.5, lty=1, col='gray')
-    #for(calibrator in uniqueCalibrators){
     for(index in seq_along(uniqueCalibrators)){
         calibrator <- uniqueCalibrators[index]
         calDF <- LST12DF[LST12DF$Src == calibrator,]
@@ -293,4 +266,7 @@ for(band in seq(1, 7)){
         }
     }
     dev.off()
+    #-------- CSV table (backward compatibility with SSR) 
+    names(srcDF)   <- c('Src', 'I', 'P', 'EVPA', 'HAmin', 'HAmax', 'HAend', 'LSTmin', 'LSTmax', 'LSTend')
+    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
 }
