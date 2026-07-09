@@ -200,8 +200,7 @@ for(band in seq(1, 7)){
     LSTwindow7  <- LSTfrag(LST7DF)
 	#-------- HTML calibrator table for 12m array
     htmlFile <- sprintf('PolCal12m-Band%d.html', band)
-	#FrameText <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST12DF[1,]$Src, band), '-PA-12m.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>', sep='')
-	FrameText <- '<iframe src="images/defaultLST.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>'
+	FrameText <- '<iframe src="images/defaultLST.png" width="768" name="plotimage-box" class="image-frame"></iframe>'
     HTMLdf <- LST12DF
 	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST12DF$Src, band), '-PA-12m.png" target="plotimage-box"> ',  LST12DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
@@ -212,8 +211,7 @@ for(band in seq(1, 7)){
     write(paste(html.head, html.body, sep='\n'), htmlFile)
 	#-------- HTML calibrator table for 7m array
     htmlFile <- sprintf('PolCal7m-Band%d.html', band)
-	#FrameText <- paste('<iframe src="PNG/',  sprintf('%s-Band%d', LST7DF[1,]$Src, band), '-PA-7m.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>', sep='')
-	FrameText <- '<iframe src="images/defaultLST.png" width="1024" height="768" name="plotimage-box" class="image-frame"></iframe>'
+	FrameText <- '<iframe src="images/defaultLST.png" width="768" name="plotimage-box" class="image-frame"></iframe>'
     HTMLdf <- LST7DF
 	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST7DF$Src, band), '-PA-7m.png" target="plotimage-box"> ',  LST7DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
