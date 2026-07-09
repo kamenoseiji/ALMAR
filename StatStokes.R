@@ -12,16 +12,26 @@ estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     timeWeightSoftening <- 5* 86400 # 5-day softening
     if( (max(df$relFreq) < 0.65) | (max(df$relFreq) / min(df$relFreq) < 2.0 )){ return( IQUV )}
     df$timeFreqDeparture <- (abs(df$relTime) + timeWeightSoftening) * (1.0 + abs(df$relFreq - 1))
-    fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=df, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
-    fitP <- lm(formula=log(P) ~ log(relFreq) + relTime, data=df, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
-    df$V <- df$V*df$relFreq^coef(summary(fitI))[2]
-    fitV <- lm(formula=V ~ relTime, data=df, weight=(I / eV) * (timeWeightSoftening / timeFreqDeparture))
     weight <- 1.0/(abs(df$eEVPA) * sqrt(df$eQ^2 + df$eU^2)* abs(log(df$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(df$relTime + timeWeightSoftening)))
+    if( diff(range(df$relTime)) > timeWeightSoftening){
+        fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=df, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
+        fitP <- lm(formula=log(P) ~ log(relFreq) + relTime, data=df, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
+        df$V <- df$V*df$relFreq^coef(summary(fitI))[2]
+        fitV <- lm(formula=V ~ relTime, data=df, weight=(I / eV) * (timeWeightSoftening / timeFreqDeparture))
+        IQUV$I <- exp(coef(fitI)[[1]])
+        IQUV$P <- exp(coef(fitP)[[1]])
+        IQUV$eI <- IQUV$I* coef(summary(fitI))[4]
+        IQUV$eP <- IQUV$P* coef(summary(fitP))[4]
+    } else {    # insufficient time range
+        fitI <- lm(formula=log(I) ~ log(relFreq), data=df, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
+        fitP <- lm(formula=log(P) ~ log(relFreq), data=df, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
+        fitV <- lm(formula=V ~ relFreq, data=df, weight=(I / eV) * (timeWeightSoftening / timeFreqDeparture))
+        IQUV$I <- exp(coef(fitI)[[1]])
+        IQUV$P <- exp(coef(fitP)[[1]])
+        IQUV$eI <- IQUV$I* coef(summary(fitI))[3]
+        IQUV$eP <- IQUV$P* coef(summary(fitP))[3]
+    }
     Twiddle <- sum( weight* exp((0.0 + 2.0i)*df$EVPA) ) / sum(weight); Twiddle <- Twiddle/abs(Twiddle)
-    IQUV$I <- exp(coef(fitI)[[1]])
-    IQUV$eI <- IQUV$I* coef(summary(fitI))[4]
-    IQUV$P <- exp(coef(fitP)[[1]])
-    IQUV$eP <- IQUV$P* coef(summary(fitP))[4]
     IQUV$Q <- IQUV$P* Re(Twiddle)
     IQUV$U <- IQUV$P* Im(Twiddle)
     IQUV$EVPA  <- 0.5* Arg(Twiddle)
