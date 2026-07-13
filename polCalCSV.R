@@ -187,12 +187,12 @@ for(band in seq(1, 7)){
     srcDF <- srcDF[abs(srcDF$DEC - ALMA_LAT) > 3.0/RADDEG,]  # avoid zenith passage
     srcDF$ELHA <- acos(EL_HA(minSinEL, srcDF$DEC))  # Hour angle [rad] above EL limit (30 deg)
     for(index in 1:nrow(srcDF)){
-		pngFile <- sprintf('%s-Band%d-PA-12m.png', srcDF$Src[index], band)
-		png(pngFile, width=1024, height=768)
+		pdfFile <- sprintf('%s-Band%d-PA-12m.pdf', srcDF$Src[index], band)
+		pdf(pdfFile)
         LST12DF <- rbind(LST12DF, HArange(srcDF[index,], Pthresh12[band], BandPA[band]))
 		dev.off()
-		pngFile <- sprintf('%s-Band%d-PA-7m.png', srcDF$Src[index], band)
-		png(pngFile, width=1024, height=768)
+		pdfFile <- sprintf('%s-Band%d-PA-7m.pdf', srcDF$Src[index], band)
+		pdf(pdfFile)
         LST7DF <- rbind(LST7DF, HArange(srcDF[index,], Pthresh7[band], BandPA[band]))
 		dev.off()
     }
@@ -202,7 +202,7 @@ for(band in seq(1, 7)){
     htmlFile <- sprintf('PolCal12m-Band%d.html', band)
 	FrameText <- '<iframe src="images/defaultLST.png" width="768" name="plotimage-box" class="image-frame"></iframe>'
     HTMLdf <- LST12DF
-	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST12DF$Src, band), '-PA-12m.png" target="plotimage-box"> ',  LST12DF$Src, ' </a>', sep='')
+	HTMLdf$Src <- paste('<a href="PDF/', sprintf('%s-Band%d', LST12DF$Src, band), '-PA-12m.pdf" target="plotimage-box"> ',  LST12DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
@@ -213,7 +213,7 @@ for(band in seq(1, 7)){
     htmlFile <- sprintf('PolCal7m-Band%d.html', band)
 	FrameText <- '<iframe src="images/defaultLST.png" width="768" name="plotimage-box" class="image-frame"></iframe>'
     HTMLdf <- LST7DF
-	HTMLdf$Src <- paste('<a href="PNG/', sprintf('%s-Band%d', LST7DF$Src, band), '-PA-7m.png" target="plotimage-box"> ',  LST7DF$Src, ' </a>', sep='')
+	HTMLdf$Src <- paste('<a href="PDF/', sprintf('%s-Band%d', LST7DF$Src, band), '-PA-7m.pdf" target="plotimage-box"> ',  LST7DF$Src, ' </a>', sep='')
     HTMLdf$EVPA <- RADDEG* HTMLdf$EVPA; HTMLdf$LST_start1 <- hourPerRad* HTMLdf$LST_start1; HTMLdf$LST_start2 <- hourPerRad* HTMLdf$LST_start2; HTMLdf$LST_end <- hourPerRad* HTMLdf$LST_end
     names(HTMLdf) <- c('Source', 'I [Jy]', 'P [Jy]', 'EVPA [deg]', 'LST_start1 [h]', 'LST_start2 [h]', 'LST_end [h]')
     html.table <- paste(print(xtable(HTMLdf, digits=c(0,0,3,3,2,2,2,2)), include.rownames=F, type="html", sanitize.text.function=function(x){x}, htmlFile), collapse="\n")
@@ -222,6 +222,7 @@ for(band in seq(1, 7)){
     write(paste(html.head, html.body, sep='\n'), htmlFile)
     #-------- Plot 
     uniqueCalibrators <- unique(LST12DF$Src)
+    LSTDF <- data.frame(Src = uniqueCalibrators); LSTDF$LSTmax <- LSTDF$LSTmin <- LSTDF$EVPA <- LSTDF$P <- LSTDF$I <- rep(NA, length(uniqueCalibrators))
 	pngFile <- sprintf('Band%d-LST.png', band)
     png(pngFile, width=1536, height=1024)
     par(mar=c(4,8,3,3))
@@ -234,6 +235,9 @@ for(band in seq(1, 7)){
     grid(nx=24, ny=0, lwd=0.5, lty=1, col='gray')
     for(index in seq_along(uniqueCalibrators)){
         calibrator <- uniqueCalibrators[index]
+        LSTDF[LSTDF$Src == calibrator,]$I <- LST12DF[LST12DF$Src == calibrator,]$I[1]
+        LSTDF[LSTDF$Src == calibrator,]$P <- LST12DF[LST12DF$Src == calibrator,]$P[1]
+        LSTDF[LSTDF$Src == calibrator,]$EVPA <- LST12DF[LST12DF$Src == calibrator,]$EVPA[1]
         calDF <- LST12DF[LST12DF$Src == calibrator,]
         segWidth <- max(50*calDF$P[1], 15)
         abline(h=LSTplot[index], col='black', lwd=0.5)
@@ -262,9 +266,10 @@ for(band in seq(1, 7)){
                 arrows(0.0, LSTplot[index], hourPerRad* max(calDF$LST_start2) - 24.0, LSTplot[index], length=0, lwd=segWidth, col='red')
             }
         }
+        LSTDF[LSTDF$Src == calibrator,]$LSTmin <- min(calDF$LST_start1)
+        LSTDF[LSTDF$Src == calibrator,]$LSTmax <- max(calDF$LST_start2)
     }
     dev.off()
     #-------- CSV table (backward compatibility with SSR) 
-    names(srcDF)   <- c('Src', 'I', 'P', 'EVPA', 'HAmin', 'HAmax', 'HAend', 'LSTmin', 'LSTmax', 'LSTend')
-    write.csv(srcDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
+    write.csv(LSTDF[, c('Src', 'I', 'P', 'EVPA', 'LSTmin', 'LSTmax')], sprintf('PolCalBand%d.csv', band), row.names=FALSE)
 }
