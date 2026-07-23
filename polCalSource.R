@@ -2,6 +2,7 @@ library(RCurl)
 library(RColorBrewer)
 eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
 #source('../StatStokes.R')
+substructureDF <- read.table('../Substructure.txt', header=TRUE)   # Read substructure contamination table
 #-------- FE-specific PA
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
@@ -18,16 +19,20 @@ Today <- Sys.time()
 srcFreqCalibrator <- function(DF, band){
     sourceList <- sort(unique(DF$Src))
     numSrc <- length(sourceList)
-    srcDF <- data.frame(Src=sourceList, I=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), V=numeric(numSrc), P=numeric(numSrc), EVPA=numeric(numSrc), eI=numeric(numSrc), eQ=numeric(numSrc), eU=numeric(numSrc), eV=numeric(numSrc), eP=numeric(numSrc), eEVPA=numeric(numSrc))
+    srcDF <- data.frame(Src=sourceList, I=numeric(numSrc), Q=numeric(numSrc), U=numeric(numSrc), V=numeric(numSrc), P=numeric(numSrc), EVPA=numeric(numSrc), eI=numeric(numSrc), eQ=numeric(numSrc), eU=numeric(numSrc), eV=numeric(numSrc), eP=numeric(numSrc), eEVPA=numeric(numSrc), subThresh=numeric(numSrc))
     for(src in sourceList){
         SDF <- DF[DF$Src == src,]
         SDF <- SDF[SDF$eI < 0.5*SDF$I,]
         if(nrow(SDF) < 5){ next }
-        srcDF[srcDF$Src == src,] <- estimateIQUV(SDF, BandFreq[band], Today)
+        srcDF[srcDF$Src == src,][1:13] <- estimateIQUV(SDF, BandFreq[band], Today)
+        if( src %in% substructureDF$Source ){
+            strdf <- substructureDF[substructureDF$Source == src,]
+            srcDF[srcDF$Src == src,]$subThresh  <- sqrt(strdf$StokesQ^2 + strdf$StokesU^2) * exp( strdf$SPIX* log(BandFreq[band]/100.0)) / mthresh
+        }
     }
     srcDF$RA  <- pi* (60.0* as.numeric(substring(sourceList, 2, 3)) + as.numeric(substring(sourceList, 4, 5))) / 720.0
     srcDF$DEC <- pi* sign(as.numeric(substring(sourceList, 6, 10)))* (as.numeric(substring(sourceList, 7, 8)) + as.numeric(substring(sourceList, 9, 10))/60.0) / 180.0
-    return( srcDF[((srcDF$P - srcDF$eP > Pthresh12[band]) & ((srcDF$P - srcDF$eP)/(srcDF$I + srcDF$eI) > 0.03)),] )     # Filter by polarized flux and polarization degree
+    return( srcDF[((srcDF$P - srcDF$eP > Pthresh12[band]) & ((srcDF$P - srcDF$eP)/(srcDF$I + srcDF$eI) > 0.03) & (srcDF$P - srcDF$eP > srcDF$subThresh)),] )     # Filter by polarized flux and polarization degree
 }
 #-------- Load Flux.Rdata from web
 #FluxDataURL <- "https://www.alma.cl/~skameno/AMAPOLA/"

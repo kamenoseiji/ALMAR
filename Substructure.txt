@@ -1,0 +1,4 @@
+# Stationary subcomponents
+# Stokes parameters [Jy] at 100 GHz, with the spectral index
+Source     StokesI    StokesQ   StokesU    StokesV    SPIX Remarks 
+J0904-5735 3.955e-02 -2.68e-03  5.594e-03 -2.268e-04 -1.0  PRTSPR-90759
