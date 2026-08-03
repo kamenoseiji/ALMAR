@@ -2,7 +2,7 @@ library(RCurl)
 eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
 #source('../StatStokes.R')
 BandFreq<-c(43.0,  75.0,  97.5, 132.0, 183.0, 233.0, 343.5, 400.0, 650.0, 800.0)
-timeWindow <- 20*86400  # 20 days
+timeWindow <- 1000*86400  # 1000 days
 load('Flux.Rdata')
 UIDList <- c()
 for(freq in BandFreq){

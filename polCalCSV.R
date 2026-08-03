@@ -92,6 +92,7 @@ HArange <- function(df, thresh, BPA){
 	lines((calDF$HA + df$RA)*hourPerRad, calDF$XYcorr, col='darkgreen', lwd=2)
     for(intercept in HA_intercepts){ text((intercept + df$RA)*hourPerRad, min(calDF$XYcorr), sprintf('%.1fh', (intercept + df$RA)*hourPerRad), pos=4, srt=90) }
     calDF <- calDF[calDF$HA < max(HA_intercepts) - pointingDuration,]          # start time must be before the last intercept
+    if(nrow(calDF) < 1){ return(na.omit(DF)) }
     #-------- HA range for |XY| > thresh
     indexRange <- which(abs(calDF$XYcorr) > thresh)
     for(intercept in sort(HA_intercepts, TRUE)){
