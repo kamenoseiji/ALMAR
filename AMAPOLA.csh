@@ -22,6 +22,7 @@ cp ../HTML/*.html AMAPOLA
 cp -r ../HTML/resources AMAPOLA
 cp -r ../HTML/images AMAPOLA
 cp Flux.Rdata AMAPOLA
+cp Flux.parquet AMAPOLA
 cp AeDF.Rdata AMAPOLA
 cp Dterm.Rdata AMAPOLA
 cp amapola.txt AMAPOLA

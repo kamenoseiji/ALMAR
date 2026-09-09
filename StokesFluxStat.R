@@ -1,6 +1,7 @@
 library(parallel)   # multicore parallelization
 library(dplyr)
 library(VGAM)       # for Rice distribution
+library(arrow)       # for Rice distribution
 Sys.setenv(TZ="UTC")
 sysIerr <- 0.005       # temporal Stokes I systematic error
 sysPerr <- 0.003       # temporal polarization systematic error
@@ -136,3 +137,4 @@ FLDF$eV <- sqrt(FLDF$eV^2 + (sysPerr*FLDF$V)^2)
 FLDF$Date <- as.POSIXct(FLDF$Date, tz="GMT")
 FLDF <- FLDF[order(FLDF$Date),]
 save(FLDF, file='Flux.Rdata')
+write_parquet(FLDF, "Flux.parquet")
