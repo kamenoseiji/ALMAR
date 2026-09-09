@@ -93,6 +93,12 @@
 <p><a href="Flux.Rdata">Link to Flux.Rdata</a>, a data frame readable with the R statistical language. In R, it is also accessible by the command:</p>
 <p class="codeStyle">load(url("https://www.alma.cl/~skameno/AMAPOLA/Flux.Rdata"))</p>
 <p>then the data frame "FLDF" records all of Stokes parameters.</p>
+<hr>
+<!---- Link to parquet data frame ---->
+<p>Now <a href="Flux.parquet">Link to Flux.parquet</a> is available for Python via Polars. In Python, load the data frame as:</p>
+<p class="codeStyle">import polars as pl</p>
+<p class="codeStyle">FLDF = pl.read_parquet("https://www.alma.cl/~skameno/AMAPOLA/Flux.parquet")</p>
+<p>then the data frame "FLDF" records all of Stokes parameters.</p>
 
 <hr>
 <h3 class="title3">Related Documents</h3>
