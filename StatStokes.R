@@ -13,7 +13,7 @@ estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     if( (max(df$relFreq) < 0.65) | (max(df$relFreq) / min(df$relFreq) < 2.0 )){ return( IQUV )}
     df$timeFreqDeparture <- (abs(df$relTime) + timeWeightSoftening) * (1.0 + abs(df$relFreq - 1))
     weight <- 1.0/(abs(df$eEVPA) * sqrt(df$eQ^2 + df$eU^2)* abs(log(df$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(df$relTime + timeWeightSoftening)))
-    if( diff(range(df$relTime)) > timeWeightSoftening){
+    if( diff(range(df$relTime)) > min(abs(df$relTime))){
         fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=df, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
         SPIX <- coef(fitI)[[2]] # Spectral Index
         IQUV$I <- exp(coef(fitI)[[1]])
