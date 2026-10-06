@@ -15,11 +15,14 @@ estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     weight <- 1.0/(abs(df$eEVPA) * sqrt(df$eQ^2 + df$eU^2)* abs(log(df$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(df$relTime + timeWeightSoftening)))
     if( diff(range(df$relTime)) > timeWeightSoftening){
         fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=df, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
-        fitP <- lm(formula=log(P) ~ log(relFreq) + relTime, data=df, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
+        SPIX <- coef(fitI)[[2]] # Spectral Index
+        IQUV$I <- exp(coef(fitI)[[1]])
+        df$P <- df$P * exp(SPIX* df$relFreq)
+        df$eP <- df$eP * exp(SPIX* df$relFreq)
+        fitP <- lm(P ~ relTime, data=df, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
         df$V <- df$V*df$relFreq^coef(summary(fitI))[2]
         fitV <- lm(formula=V ~ relTime, data=df, weight=(I / eV) * (timeWeightSoftening / timeFreqDeparture))
-        IQUV$I <- exp(coef(fitI)[[1]])
-        IQUV$P <- exp(coef(fitP)[[1]])
+        IQUV$P <- coef(fitP)[[1]]
         IQUV$eI <- IQUV$I* coef(summary(fitI))[4]
         IQUV$eP <- IQUV$P* coef(summary(fitP))[4]
     } else {    # insufficient time range
