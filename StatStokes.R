@@ -17,8 +17,8 @@ estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
         fitI <- lm(formula=log(I) ~ log(relFreq) + relTime, data=df, weight=(I / eI) * (timeWeightSoftening / timeFreqDeparture))
         SPIX <- coef(fitI)[[2]] # Spectral Index
         IQUV$I <- exp(coef(fitI)[[1]])
-        df$P <- df$P * exp(SPIX* log(df$relFreq))
-        df$eP <- df$eP * exp(SPIX* log(df$relFreq))
+        df$P <- df$P * exp(-SPIX* log(df$relFreq))
+        df$eP <- df$eP * exp(-SPIX* log(df$relFreq))
         fitP <- lm(P ~ relTime, data=df, weight=(P / eP) * (timeWeightSoftening / timeFreqDeparture))
         df$V <- df$V*df$relFreq^coef(summary(fitI))[2]
         fitV <- lm(formula=V ~ relTime, data=df, weight=(I / eV) * (timeWeightSoftening / timeFreqDeparture))
