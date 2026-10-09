@@ -3,9 +3,8 @@ source('~/ALMAR/ReadAeffLib.R')
 #Arguments <- commandArgs(trailingOnly = T)
 #fileList <- parseArg(Arguments)
 fileList <- parseArg('UIDList')
-#AeDF <- data.frame(matrix(rep(NA, length(FMT)), nrow=1))[numeric(0),]; colnames(AeDF) <- FMT
 DFList <- mclapply(fileList, Log2Aeff, mc.cores=numCore)
-AeDF <- do.call("rbind", DFList)
+AeDF <- na.omit(bind_rows(DFList))
 save(AeDF, file='AeDF.Rdata')
 AeDF <- AeDF[complete.cases(AeDF$AeX),]
 AeDF <- AeDF[complete.cases(AeDF$AeY),]

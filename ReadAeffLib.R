@@ -45,13 +45,15 @@ findCalibrator <- function( Lines ){
     for(SSO in SSOlist){ if(length(grep(SSO, Lines[SSOListPointer])) > 0){ UsedSSOList[length(UsedSSOList)+1]  <- SSO}}
     if( length(UsedSSOList) == 0){ return(list(0)) }
     for(SSO in UsedSSOList){
-        datePointer <- grep(SSO, Lines[4:length(Lines)]) + 3
+        datePointer <- grep(SSO, Lines[(SSOListPointer+1):length(Lines)]) + SSOListPointer 
+        if( length(datePointer) == 0){ next }
         fluxCalName <- strsplit(Lines[datePointer], '[ |=]+')[[1]][3]
         EL <- as.numeric(strsplit(Lines[datePointer], '[ |=]+')[[1]][5])
 	    scalerUTC <- strptime(strsplit(Lines[datePointer], '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S")
     	sunsetUTC <- getSunlightTimes(as.Date(scalerUTC), lat=ALMA_POS[2], lon=ALMA_POS[1])['sunset'][[1]]
 		return(list(calibrator=fluxCalName, EL=EL, UTC=scalerUTC, sunset=as.numeric(scalerUTC-sunsetUTC)%%24))
     }
+    return(list(0))
 }
 #-------- Read Aeff Section
 readAeffSection <- function(Lines){
