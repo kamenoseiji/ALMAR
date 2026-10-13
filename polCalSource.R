@@ -13,7 +13,7 @@ mthresh <- 0.03                                                                 
 SECPERDAY <- 86400
 hourPerRad <- 12/pi		# radian to hour angle conversion
 RADDEG <- 180.0/pi
-DateRange <- 90    # 60-day window
+DateRange <- 60    # 60-day window
 Today <- Sys.time()
 #-------- Filter calibrators for band
 srcFreqCalibrator <- function(DF, band){
