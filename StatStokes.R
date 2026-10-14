@@ -61,10 +61,25 @@ predStokes <- function(df){
     newDF$File <- df$File[1]
     return(newDF)
 }
-#-------- Input multiple frequency data and output Stokes parameters at the standard frequency
 SPfit <- function(df){
-    df <- rbind(df, data.frame(relTime=abs(df[1,]$relTime)*seq(0.5, 1.4, by=0.1), Value=rep(median(df$Value), 10), error=rep(sum(df$error), 10)))
-    gam_model <- gam(Value ~ s(relTime, bs="cr"), data=df, weights=1/error^2, sp=0.3*abs(df[1,]$relTime))
-    pred_gam <- predict(gam_model, newdata=data.frame(relTime=0.0), se.fit=TRUE)
-    return( pred_gam$fit  + (0.0 + 1.0i)*pred_gam$se.fit )
+    #-------- Compact Log-Likelihood Function for smoothing
+    scaledTime <- df$relTime / 1e6              # to avoid overlow
+    DistMatrix <- as.matrix(dist(scaledTime))
+    gp_nll <- function(poly) {      # polynimial parameters
+        mu    <- poly[1] + poly[2] * scaledTime
+        Sigma <- exp(poly[3]) * exp(-(DistMatrix / exp(poly[4]))^2) + diag(df$error^2)
+        L     <- chol(Sigma)
+        0.5 * (2 * sum(log(diag(L))) + sum(backsolve(L, df$Value - mu, transpose = TRUE)^2))
+    }
+    #-------- Fit & Extract Optimal Parameters
+    fit <- nlminb(c(0.02, 0.01, log(0.01), 0), gp_nll)$par
+    b0  <- fit[1]; b1 <- fit[2]; sig2 <- exp(fit[3]); range <- exp(fit[4])
+    #-------- Predict at relTime = 0.0
+    r_target   <- sig2 * exp(-(abs(scaledTime - 0) / range)^2)
+    Sigma_opt  <- sig2 * exp(-(DistMatrix / range)^2) + diag(df$error^2)
+    L <- chol(Sigma_opt)
+    residual <- df$Value - (b0 + b1 * scaledTime)
+    alpha    <- backsolve(L, residual, transpose = TRUE)
+    prediction <- as.numeric(b0 + t(r_target) %*% backsolve(L, alpha))
+    return(prediction + (0.0 + 1.0i)* sqrt(as.numeric(sig2)))
 }
