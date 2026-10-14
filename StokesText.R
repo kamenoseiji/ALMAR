@@ -80,7 +80,7 @@ for(band in bandList){
     cat(sprintf('--- Calibrator List Band %d\n', band))
     bandDF <- recentDF[recentDF$Band == band,]
     sourceList <- unique(bandDF$Src)
-    for(source in sourceList){ if( diff(range(bandDF[bandDF$Src == source,]$relTime)) < 0.5*DateRange*SECPERDAY ){ bandDF <- bandDF[bandDF$Src != source,]}}
+    for(source in sourceList){ if( diff(range(bandDF[bandDF$Src == source,]$relTime)) < 0.25*DateRange*SECPERDAY ){ bandDF <- bandDF[bandDF$Src != source,]}}
     sourceList <- unique(bandDF$Src)
     sourceList <- sourceList[grep('^J[0-9]',sourceList)]
     if(length(sourceList) < 1){ next }
