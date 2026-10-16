@@ -67,12 +67,12 @@ SPfit <- function(df){
     DistMatrix <- as.matrix(dist(scaledTime))
     gp_nll <- function(poly) {      # polynimial parameters
         mu    <- poly[1] + poly[2] * scaledTime
-        Sigma <- exp(poly[3]) * exp(-(DistMatrix / exp(poly[4]))^2) + diag(df$error^2)
+        Sigma <- exp(poly[3]) * exp(-(DistMatrix / exp(poly[4]))^2) + diag((df$error + 0.001)^2)
         L     <- chol(Sigma)
         0.5 * (2 * sum(log(diag(L))) + sum(backsolve(L, df$Value - mu, transpose = TRUE)^2))
     }
     #-------- Fit & Extract Optimal Parameters
-    fit <- nlminb(c(0.02, 0.01, -1, 0.01), gp_nll)$par
+    fit <- nlminb(c(0.0, 0.0, -1, 0.01), gp_nll)$par
     b0  <- fit[1]; b1 <- fit[2]; sig2 <- exp(fit[3]); range <- exp(fit[4])
     #-------- Predict at relTime = 0.0
     r_target   <- sig2 * exp(-(abs(scaledTime - 0) / range)^2)

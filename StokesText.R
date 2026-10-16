@@ -85,16 +85,15 @@ for(band in bandList){
     sourceList <- sourceList[grep('^J[0-9]',sourceList)]
     if(length(sourceList) < 1){ next }
     lastObsIndex <- order(bandDF$Date, decreasing=TRUE)[1]
-    srcDF <- mclapply(sourceList, function(source){
-        DF <- bandDF[bandDF$Src == source, ]
-        return(data.frame(
-            Src=source,
-            numObs = nrow(DF),
-            I = SPfit(data.frame(relTime = DF$relTime, Value=DF$I, error=DF$eI)),
-            Q = SPfit(data.frame(relTime = DF$relTime, Value=DF$Q, error=DF$eQ)),
-            U = SPfit(data.frame(relTime = DF$relTime, Value=DF$U, error=DF$eU))))
-    }, mc.cores=numCore)
-    srcDF <- na.omit(bind_rows(srcDF))
+    srcDF <- data.frame(Src = sourceList, numObs = 0, I = 0.0, Q = 0.0, U = 0.0)
+    for(source in sourceList){
+        DF <- bandDF[bandDF$Src == source,]
+        srcDF[srcDF$Src == source,]$numObs <- nrow(DF)
+        srcDF[srcDF$Src == source,]$I <- SPfit(data.frame(relTime = DF$relTime, Value=DF$I, error=DF$eI))
+        srcDF[srcDF$Src == source,]$Q <- SPfit(data.frame(relTime = DF$relTime, Value=DF$Q, error=DF$eQ))
+        srcDF[srcDF$Src == source,]$U <- SPfit(data.frame(relTime = DF$relTime, Value=DF$U, error=DF$eU))
+    }
+    srcDF <- na.omit(srcDF)
     srcDF$eI <- Im(srcDF$I); srcDF$eQ <- Im(srcDF$Q); srcDF$eU <- Im(srcDF$U) 
     srcDF$I  <- Re(srcDF$I); srcDF$Q  <- Re(srcDF$Q); srcDF$U  <- Re(srcDF$U) 
     srcDF <- srcDF[,c(1,2,3,6,4,7,5,8)]
