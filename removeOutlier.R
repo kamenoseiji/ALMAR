@@ -23,7 +23,7 @@ for(freq in BandFreq){
             fitI <- lm(formula = I ~ relFreq, data = sdf, weights = 1/eI^2); df$I[date_index] <- coef(summary(fitI))[1]
         }
         #-------- define local level model
-        smthDF <- KFASsmooth(data.frame(time=df$relTime, value=df$I))
+        smthDF <- KFASsmooth(data.frame(time=df$relTime, value=df$I), 0.99)
         outlier_index <- which( ((df$I < smthDF$lower) | (df$I > smthDF$upper)))
         for(index in outlier_index){
             outlier_file <- srcDF[as.numeric(srcDF$Date) - Today == df$relTime[index],]$File[1]
@@ -31,6 +31,7 @@ for(freq in BandFreq){
             cat(text_sd)
             FLDF[as.numeric(FLDF$Date) - Today == df$relTime[index],]$QC <- FLDF[as.numeric(FLDF$Date) - Today == df$relTime[index],]$QC* 0.1   # Outlier flag
         }
+    }
 }
 save(FLDF, file='Flux.Rdata')
 write_parquet(FLDF, "Flux.parquet")
