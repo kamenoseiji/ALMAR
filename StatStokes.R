@@ -1,4 +1,4 @@
-#library(mgcv)
+library(KFAS)
 #-------- Estimate Stokes parameters by frequency and date 
 estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     DF$relFreq <- DF$Freq / refFreq
@@ -61,6 +61,7 @@ predStokes <- function(df){
     newDF$File <- df$File[1]
     return(newDF)
 }
+#-------- Predict value at t=0
 SPfit <- function(df){
     #-------- Compact Log-Likelihood Function for smoothing
     scaledTime <- df$relTime / 1e6              # to avoid overlow
@@ -82,4 +83,13 @@ SPfit <- function(df){
     alpha    <- backsolve(L, residual, transpose = TRUE)
     prediction <- as.numeric(b0 + t(r_target) %*% backsolve(L, alpha))
     return(prediction + (0.0 + 1.0i)* sqrt(as.numeric(sig2)))
+}
+#-------- Upper and lower confidence band with the given level
+KFASsmooth <- function(df, conf_level=0.95){
+    mod <- SSModel(df$value ~ SSMtrend(1, Q = NA), H = NA)
+    fit <- fitSSM(mod, numeric(2), method = 'BFGS')
+    alphahatconf <- predict(fit$model, interval = 'confidence', level = conf_level)
+    df$lower <- alphahatconf[,2]
+    df$upper <- alphahatconf[,3]
+    return(df)
 }
