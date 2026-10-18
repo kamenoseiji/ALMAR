@@ -1,4 +1,3 @@
-library(KFAS)
 #-------- Estimate Stokes parameters by frequency and date 
 estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     DF$relFreq <- DF$Freq / refFreq

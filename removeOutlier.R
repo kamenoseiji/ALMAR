@@ -1,4 +1,5 @@
 library(RCurl)
+library(KFAS)
 library(arrow)
 eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
 #source('../StatStokes.R')
