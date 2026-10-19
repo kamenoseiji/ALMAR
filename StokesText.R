@@ -119,37 +119,31 @@ cat('Generaging AMAPOLA.pdf\n')
 pdf('AMAPOLA.pdf', width=8, height=11)
 par.old <- par(no.readonly=TRUE)
 par(mfrow=c(3,1), oma=c(0, 0, 4, 0), mar=c(4,4,4,4))
-labels <- c("B1",        "B2",          "B3",        "B4",        "B6",        "B7",        "> B7")
-freqLabels <- c('40 GHz', '79.5 GHz',   '97.5 GHz', '154.9 GHz', '233 GHz',   '343.4 GHz', '410.2 GHz')
+labels <- c("B1",        "B2",          "B3",        "B4",        "B6",        "B7")
+freqLabels <- c('40 GHz', '79.5 GHz',   '97.5 GHz', '154.9 GHz', '233 GHz',   '343.4 GHz')
 colors <- c("#FF80003F", "#F010003F", "#E020003F", "#8080003F", "#00C0803F", "#0000FF3F", "#0000003F")
 plotXrange <- range(FLDF$Date)
-bandList <- unique(textDF$Band)
+bandList <- sort(unique(textDF$Band))
 bandIndex <- c(1,2,3,4,0,5,6,7,0)
 sourceList <- unique(textDF$Src)
 sourceList <- sourceList[grep('^J[0-9]',sourceList)]
 sourceList <- sourceList[order(sourceList)]
-for(sourceName in sourceList){
+textDF$color_vector <- "#000000FF"
+for(band in bandList){ textDF[textDF$Band == band,]$color_vector <- colors[bandIndex[band]] }
+
+plotPDF <- function(sourceName){
 	DF <- textDF[textDF$Src == sourceName,]
-    #-------- Coloring by frequency
-    DF$color_vector <- rep("#000000FF", nrow(DF))
-    for(band in bandList){
-        if(nrow(DF[DF$Band == band,]) == 0){ next }
-        DF[DF$Band == band,]$color_vector <- colors[bandIndex[band]]
-    }
-    DF <- DF[DF$color_vector != "#000000FF",]
 	#-------- Plot Stokes I
 	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', xlim=as.POSIXct(plotXrange), ylim=c(0, 1.2*max(DF$I)))
 	arrows(as.numeric(DF$Date), DF$I - DF$eI, as.numeric(DF$Date), DF$I + DF$eI, angle=90, length=0.0, col=DF$color_vector)
 	points(DF$Date, DF$I, pch=20, col=DF$color_vector)
     legend("bottomleft", legend=labels, pch=20, col=colors)
     axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
-	
 	#-------- Plot polarized flux
 	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', xlim=as.POSIXct(plotXrange), ylim=c(0, 1.2* max(DF$P)))
 	arrows(as.numeric(DF$Date), DF$eP_lower, as.numeric(DF$Date), DF$eP_upper, angle=90, length=0.0, col=DF$color_vector)
 	points(DF$Date, DF$P, pch=20, col=DF$color_vector)
     axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
-	
 	#-------- Plot EVPA
 	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', xlim=as.POSIXct(plotXrange), ylim=c(-90,90))
 	abline(h=90, lwd=0.1); abline(h=-90, lwd=0.1)
@@ -158,6 +152,41 @@ for(sourceName in sourceList){
     axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
 	mtext(side = 3, line=1, outer=T, text = sourceName, cex=2)
 }
+for(sourceName in sourceList){ plotPDF(sourceName) }
+
+#mclapply(sourceList, plotPDF, mc.cores=numCore-1)
+	
+
+#for(sourceName in sourceList){
+#	DF <- textDF[textDF$Src == sourceName,]
+#    #-------- Coloring by frequency
+#    DF$color_vector <- rep("#000000FF", nrow(DF))
+#    for(band in bandList){
+#        if(nrow(DF[DF$Band == band,]) == 0){ next }
+#        DF[DF$Band == band,]$color_vector <- colors[bandIndex[band]]
+#    }
+#    DF <- DF[DF$color_vector != "#000000FF",]
+#	#-------- Plot Stokes I
+#	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', xlim=as.POSIXct(plotXrange), ylim=c(0, 1.2*max(DF$I)))
+#	arrows(as.numeric(DF$Date), DF$I - DF$eI, as.numeric(DF$Date), DF$I + DF$eI, angle=90, length=0.0, col=DF$color_vector)
+#	points(DF$Date, DF$I, pch=20, col=DF$color_vector)
+#    legend("bottomleft", legend=labels, pch=20, col=colors)
+#    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
+#	
+#	#-------- Plot polarized flux
+#	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', xlim=as.POSIXct(plotXrange), ylim=c(0, 1.2* max(DF$P)))
+#	arrows(as.numeric(DF$Date), DF$eP_lower, as.numeric(DF$Date), DF$eP_upper, angle=90, length=0.0, col=DF$color_vector)
+#	points(DF$Date, DF$P, pch=20, col=DF$color_vector)
+#    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
+#	
+#	#-------- Plot EVPA
+#	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', xlim=as.POSIXct(plotXrange), ylim=c(-90,90))
+#	abline(h=90, lwd=0.1); abline(h=-90, lwd=0.1)
+#	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=DF$color_vector)
+#	points(DF$Date, DF$EVPA*180/pi, pch=20, col=DF$color_vector)
+#    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
+#	mtext(side = 3, line=1, outer=T, text = sourceName, cex=2)
+#}
 par(par.old)
 dev.off()
 #-------- Time-series HTML
@@ -167,27 +196,27 @@ numFreq <- length(bandList)
 bandColor <- brewer.pal(numFreq, "Dark2")
 for(sourceName in sourceList){
 	DF <- textDF[textDF$Src == sourceName,]
-    dataRange <- c(min(DF$Date)-86400, max(DF$Date)+86400))
+    dataRange <- c(min(DF$Date)-86400, max(DF$Date)+86400)
     #-------- Stokes I
     plot_I <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~I, type="scatter", mode="markers", color=paste("I", freqLabels[1]), colors=bandColor, error_y = list(array=~eI, thickness=1, width=0))
     for(freq_index in 2:numFreq){
         if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_I <- add_trace(plot_I, data=DF[DF$Band == bandList[freq_index],], color=paste("I", freqLabels[freq_index]))}
     }
-    plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=dataRange, yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero', hoverformat='.3f'), title=sourceName)
+    plot_I <- layout(plot_I, xaxis=list(showgrid=T, title='Date', range=dataRange), yaxis=list(showgrid=T, title='Stokes I [Jy]',rangemode='tozero', hoverformat='.3f'), title=sourceName)
 
     #-------- Polarized Flux
     plot_P <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~P, type="scatter", mode="markers", color=paste("P",freqLabels[1]), colors=bandColor, error_y = list(symmetric=FALSE, array=~(eP_upper - P), arrayminus=~(P-eP_lower), thickness=1, width=0))
     for(freq_index in 2:numFreq){
         if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_P <- add_trace(plot_P, data=DF[DF$Band == bandList[freq_index],], color=paste("P",freqLabels[freq_index]))}
     }
-    plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=dataRange, yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero', hoverformat='.3f'))
+    plot_P <- layout(plot_P, xaxis=list(showgrid=T, title='Date', range=dataRange), yaxis=list(showgrid=T, title='Polarized Flux [Jy]',rangemode='tozero', hoverformat='.3f'))
 
     #-------- EVPA
     plot_A <- plot_ly(data=DF[DF$Band == bandList[1],], x=~Date, y=~EVPA*180/pi, type="scatter", mode="markers", color=paste("EVPA",freqLabels[1]), colors=bandColor, error_y = list(array=~eEVPA*180/pi, thickness=1, width=0))
     for(freq_index in 2:numFreq){
         if(nrow(DF[DF$Band == bandList[freq_index],]) > 0){ plot_A <- add_trace(plot_A, data=DF[DF$Band == bandList[freq_index],], color=paste("EVPA",freqLabels[freq_index]))}
     }
-    plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=dataRange, yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91), hoverformat='.1f'))
+    plot_A <- layout(plot_A, xaxis=list(showgrid=T, title='Date', range=dataRange), yaxis=list(showgrid=T, title='EVPA [deg]',range=c(-91,91), hoverformat='.1f'))
 
     allPlot <- subplot(plot_I, plot_P, plot_A, nrows=3, shareX=T, titleY=T)
     htmlFile <- sprintf("%s.flux.html", sourceName)
