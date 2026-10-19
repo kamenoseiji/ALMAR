@@ -9,7 +9,7 @@ cd WORK
 \rm -rf AMAPOLA
 \ls -la *Flux.log | awk '{if ($5 >= 1024) print $9}' > fileList
 Rscript ../StokesFluxStat.R fileList
-Rscript ../removeOutlier.R
+#Rscript ../removeOutlier.R
 Rscript ../polCalSource.R
 Rscript ../polCalCSV.R
 Rscript ../SSOUID.R
