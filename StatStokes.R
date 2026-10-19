@@ -47,10 +47,10 @@ estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
 #-------- Input multiple frequency data and output Stokes parameters at the standard frequency
 predStokes <- function(df){
     bandID   <- df$Band[1]
-    fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/eI^2)
-    fitQ <- lm(formula=Q ~ Freq, data=df, weight=1.0/eQ^2)
-    fitU <- lm(formula=U ~ Freq, data=df, weight=1.0/eU^2)
-    fitV <- lm(formula=V ~ Freq, data=df, weight=1.0/eV^2)
+    fitI <- lm(formula=I ~ Freq, data=df, weight=1.0/(eI^2 + 1e-6))
+    fitQ <- lm(formula=Q ~ Freq, data=df, weight=1.0/(eQ^2 + 1e-6))
+    fitU <- lm(formula=U ~ Freq, data=df, weight=1.0/(eU^2 + 1e-6))
+    fitV <- lm(formula=V ~ Freq, data=df, weight=1.0/(eV^2 + 1e-6))
     newDF <- data.frame(Src=df$Src[1], Freq = standardFreq[[bandID]], EL=df$EL[1])
     pred <- as.numeric(predict(fitI, newDF, interval='confidence', level=0.67)); newDF$I <- matrix(pred, ncol=3)[,1]; newDF$eI <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
     pred <- as.numeric(predict(fitQ, newDF, interval='confidence', level=0.67)); newDF$Q <- matrix(pred, ncol=3)[,1]; newDF$eQ <- 0.5*(matrix(pred, ncol=3)[,3] - matrix(pred, ncol=3)[,2])
