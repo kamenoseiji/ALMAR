@@ -1,6 +1,8 @@
 library(RCurl)
 library(KFAS)
 library(arrow)
+#library(parallel)
+#numCore = detectCores()
 eval(parse(text = getURL("https://raw.githubusercontent.com/kamenoseiji/ALMAR/refs/heads/master/StatStokes.R", ssl.verifypeer = FALSE)))
 #source('../StatStokes.R')
 BandFreq<-c(40.0,  75.0,  97.5, 154.9, 183.0, 233.0, 343.4, 400.0, 650.0, 800.0)
