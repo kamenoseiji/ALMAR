@@ -39,6 +39,7 @@ srcFreqCalibrator <- function(DF, band){
 #load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
 load("Flux.Rdata")     # Data frame of FLDF
 FLDF <- FLDF[as.Date(FLDF$Date) > as.Date(Today) - DateRange,]  # Data frame within DateRange
+FLDF <- FLDF[FLDF$QC > 0.1,]                                    # Quality control
 #-------- Filter quasars
 FLDF <- FLDF[substr(FLDF$Src, 1, 1) == 'J',]    # only quasars
 FLDF$P  <- sqrt(FLDF$Q^2 + FLDF$U^2)

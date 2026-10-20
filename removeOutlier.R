@@ -36,6 +36,5 @@ for(freq in BandFreq){
     target_dates <- sort(unique(unlist(mclapply(sourceList, findOutlier, mc.cores=numCore))))
     FLDF$QC[as.numeric(FLDF$Date) %in% target_dates] <- 0.1
 }
-FLDF <- FLDF[FLDF$QC > 0.9,]
 save(FLDF, file='Flux.Rdata')
 write_parquet(FLDF, "Flux.parquet")

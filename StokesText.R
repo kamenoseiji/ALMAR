@@ -42,7 +42,8 @@ getBand <- function(fileList){
 }
 #-------- Starting Process
 load('Flux.Rdata')
-FLDF <- FLDF[FLDF$eI > 1e-5,]
+FLDF <- FLDF[FLDF$eI > 1e-6,]
+FLDF <- FLDF[FLDF$QC > 0.1,]                                    # Quality control
 FLDF$Band <- getBand(FLDF$File)
 recNum <- nrow(FLDF)
 FLDF <- FLDF[order(FLDF$Date, FLDF$Src, FLDF$Band, FLDF$Freq),]
