@@ -29,7 +29,7 @@ for(freq in BandFreq){
             .(I = coef(summary(fitI))[1, 1])
         }, by = .(relTime = as.numeric(Date) - Today)]
         #-------- define local level model
-        smthDF <- KFASsmooth(data.frame(time=df$relTime, value=df$I), 0.999)
+        smthDF <- KFASsmooth(data.frame(time=df$relTime, value=df$I), 0.99)
         outlier_index <- which( ((df$I < smthDF$lower) | (df$I > smthDF$upper)))
         return(Today + df$relTime[outlier_index])
     }

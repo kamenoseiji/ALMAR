@@ -85,8 +85,9 @@ SPfit <- function(df){
 }
 #-------- Upper and lower confidence band with the given level
 KFASsmooth <- function(df, conf_level=0.99){
-    mod <- SSModel(df[,2] ~ SSMtrend(1, Q = NA), H = NA)
-    fit <- fitSSM(mod, rep(log(0.1*var(df[,2], na.rm=TRUE)), 2), method = 'BFGS')
+    mod <- SSModel(df[[2]] ~ SSMtrend(1, Q = NA), H = NA)
+    #fit <- fitSSM(mod, rep(log(0.01*var(df[[2]], na.rm=TRUE)), 2), method = 'BFGS')
+    fit <- fitSSM(mod, rep(log(0.1*var(df[[2]], na.rm=TRUE)), 2), method = 'L-BFGS-B', lower=c(-50,-50), upper=c(50,50))
     alphahatconf <- predict(fit$model, interval = 'confidence', level = conf_level)
     df$lower <- alphahatconf[,2]
     df$upper <- alphahatconf[,3]
