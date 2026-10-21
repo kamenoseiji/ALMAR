@@ -89,15 +89,11 @@ for(band in bandList){
     lastObsIndex <- order(bandDF$Date, decreasing=TRUE)[1]
     srcDF <- data.frame(Src = sourceList, numObs = 0, I = 0.0, Q = 0.0, U = 0.0)
     for(source in sourceList){
-        cat(sprintf('--- %s\n', source))
         DF <- bandDF[bandDF$Src == source,]
         srcDF[srcDF$Src == source,]$numObs <- nrow(DF)
         srcDF[srcDF$Src == source,]$I <- SPfit(data.frame(relTime = DF$relTime, Value=DF$I))
         srcDF[srcDF$Src == source,]$Q <- SPfit(data.frame(relTime = DF$relTime, Value=DF$Q))
         srcDF[srcDF$Src == source,]$U <- SPfit(data.frame(relTime = DF$relTime, Value=DF$U))
-        #srcDF[srcDF$Src == source,]$I <- SPfit(data.frame(relTime = DF$relTime, Value=DF$I, error=DF$eI))
-        #srcDF[srcDF$Src == source,]$Q <- SPfit(data.frame(relTime = DF$relTime, Value=DF$Q, error=DF$eQ))
-        #srcDF[srcDF$Src == source,]$U <- SPfit(data.frame(relTime = DF$relTime, Value=DF$U, error=DF$eU))
     }
     srcDF <- na.omit(srcDF)
     srcDF$eI <- Im(srcDF$I); srcDF$eQ <- Im(srcDF$Q); srcDF$eU <- Im(srcDF$U) 
