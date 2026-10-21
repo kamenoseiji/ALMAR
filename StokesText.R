@@ -1,5 +1,6 @@
 library(RCurl)
 library(RColorBrewer)
+library(KFAS)
 library(dplyr)
 library(xtable)
 library(plotly, warn.conflicts=FALSE)
@@ -88,11 +89,15 @@ for(band in bandList){
     lastObsIndex <- order(bandDF$Date, decreasing=TRUE)[1]
     srcDF <- data.frame(Src = sourceList, numObs = 0, I = 0.0, Q = 0.0, U = 0.0)
     for(source in sourceList){
+        cat(sprintf('--- %s\n', source))
         DF <- bandDF[bandDF$Src == source,]
         srcDF[srcDF$Src == source,]$numObs <- nrow(DF)
-        srcDF[srcDF$Src == source,]$I <- SPfit(data.frame(relTime = DF$relTime, Value=DF$I, error=DF$eI))
-        srcDF[srcDF$Src == source,]$Q <- SPfit(data.frame(relTime = DF$relTime, Value=DF$Q, error=DF$eQ))
-        srcDF[srcDF$Src == source,]$U <- SPfit(data.frame(relTime = DF$relTime, Value=DF$U, error=DF$eU))
+        srcDF[srcDF$Src == source,]$I <- SPfit(data.frame(relTime = DF$relTime, Value=DF$I))
+        srcDF[srcDF$Src == source,]$Q <- SPfit(data.frame(relTime = DF$relTime, Value=DF$Q))
+        srcDF[srcDF$Src == source,]$U <- SPfit(data.frame(relTime = DF$relTime, Value=DF$U))
+        #srcDF[srcDF$Src == source,]$I <- SPfit(data.frame(relTime = DF$relTime, Value=DF$I, error=DF$eI))
+        #srcDF[srcDF$Src == source,]$Q <- SPfit(data.frame(relTime = DF$relTime, Value=DF$Q, error=DF$eQ))
+        #srcDF[srcDF$Src == source,]$U <- SPfit(data.frame(relTime = DF$relTime, Value=DF$U, error=DF$eU))
     }
     srcDF <- na.omit(srcDF)
     srcDF$eI <- Im(srcDF$I); srcDF$eQ <- Im(srcDF$Q); srcDF$eU <- Im(srcDF$U) 
@@ -131,7 +136,6 @@ sourceList <- sourceList[grep('^J[0-9]',sourceList)]
 sourceList <- sourceList[order(sourceList)]
 textDF$color_vector <- "#000000FF"
 for(band in bandList){ textDF[textDF$Band == band,]$color_vector <- colors[bandIndex[band]] }
-
 plotPDF <- function(sourceName){
 	DF <- textDF[textDF$Src == sourceName,]
 	#-------- Plot Stokes I
@@ -154,40 +158,6 @@ plotPDF <- function(sourceName){
 	mtext(side = 3, line=1, outer=T, text = sourceName, cex=2)
 }
 for(sourceName in sourceList){ plotPDF(sourceName) }
-
-#mclapply(sourceList, plotPDF, mc.cores=numCore-1)
-	
-
-#for(sourceName in sourceList){
-#	DF <- textDF[textDF$Src == sourceName,]
-#    #-------- Coloring by frequency
-#    DF$color_vector <- rep("#000000FF", nrow(DF))
-#    for(band in bandList){
-#        if(nrow(DF[DF$Band == band,]) == 0){ next }
-#        DF[DF$Band == band,]$color_vector <- colors[bandIndex[band]]
-#    }
-#    DF <- DF[DF$color_vector != "#000000FF",]
-#	#-------- Plot Stokes I
-#	plot(DF$Date, DF$I, type='n', xlab='Date', ylab='Stokes I [Jy]', main='Total Flux Density', xlim=as.POSIXct(plotXrange), ylim=c(0, 1.2*max(DF$I)))
-#	arrows(as.numeric(DF$Date), DF$I - DF$eI, as.numeric(DF$Date), DF$I + DF$eI, angle=90, length=0.0, col=DF$color_vector)
-#	points(DF$Date, DF$I, pch=20, col=DF$color_vector)
-#    legend("bottomleft", legend=labels, pch=20, col=colors)
-#    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
-#	
-#	#-------- Plot polarized flux
-#	plot(DF$Date, DF$P, type='n', xlab='Date', ylab='Polarized Flux [Jy]', main='Polarized Flux Density', xlim=as.POSIXct(plotXrange), ylim=c(0, 1.2* max(DF$P)))
-#	arrows(as.numeric(DF$Date), DF$eP_lower, as.numeric(DF$Date), DF$eP_upper, angle=90, length=0.0, col=DF$color_vector)
-#	points(DF$Date, DF$P, pch=20, col=DF$color_vector)
-#    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
-#	
-#	#-------- Plot EVPA
-#	plot(DF$Date, DF$EVPA, type='n', xlab='Date', ylab='EVPA [deg]', main='Polarization Angle', xlim=as.POSIXct(plotXrange), ylim=c(-90,90))
-#	abline(h=90, lwd=0.1); abline(h=-90, lwd=0.1)
-#	arrows(as.numeric(DF$Date), 180*(DF$EVPA - DF$eEVPA)/pi, as.numeric(DF$Date), 180*(DF$EVPA + DF$eEVPA)/pi, angle=90, length=0.0, col=DF$color_vector)
-#	points(DF$Date, DF$EVPA*180/pi, pch=20, col=DF$color_vector)
-#    axis.Date(1, at=seq(min(DF$Date), max(DF$Date), "months"), format="%Y-%m", cex=0.5)
-#	mtext(side = 3, line=1, outer=T, text = sourceName, cex=2)
-#}
 par(par.old)
 dev.off()
 #-------- Time-series HTML
