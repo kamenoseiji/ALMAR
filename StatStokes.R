@@ -69,7 +69,7 @@ SPfit <- function(df){
     mod <- SSModel(df_extended[[2]] ~ SSMtrend(1, Q = NA), H = NA)
     fit <- fitSSM(mod, rep(log(0.1*var(df_extended[[2]], na.rm=TRUE)), 2), method = 'L-BFGS-B', lower=c(-50,-50), upper=c(50,50))
     kfs_mod <- KFS(fit$model, smoothing = c("state", "mean"))
-    return(as.numeric(kfs_mod$alphahat[numData, 1]) + (0.0 + 1.0i)* sqrt(as.numeric(kfs_mod$V[1, 1, numData]))))
+    return(as.numeric(kfs_mod$alphahat[numData, 1]) + (0.0 + 1.0i)* sqrt(as.numeric(kfs_mod$V[1, 1, numData])))
     #-------- Compact Log-Likelihood Function for smoothing
     #scaledTime <- df$relTime / 1e6              # to avoid overlow
     #DistMatrix <- as.matrix(dist(scaledTime))
