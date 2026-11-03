@@ -9,7 +9,8 @@ estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     df$eEVPA <- 0.5* sqrt(df$Q^2 * df$eU^2 + df$U^2 * df$eQ^2) / (df$P^2)
     IQUV <- data.frame(Src=DF$Src[1], I=0.0, Q=0.0, U=0.0, V=0.0, P=0.0, EVPA=NA, eI=0.0, eQ=0.0, eU=0.0, eV=0.0, eP=0.0, eEVPA=0.0)
     timeWeightSoftening <- 5* 86400 # 5-day softening
-    if( (max(df$relFreq) < 0.65) | (max(df$relFreq) / min(df$relFreq) < 2.0 )){ return( IQUV )}
+    #if( (max(df$relFreq) < 0.65) | (max(df$relFreq) / min(df$relFreq) < 2.0 )){ return( IQUV )}
+    if( (max(df$relFreq) < 0.75) | (min(df$relFreq) > 1.5) ){ return( IQUV )}
     df$timeFreqDeparture <- (abs(df$relTime) + timeWeightSoftening) * (1.0 + abs(df$relFreq - 1))
     weight <- 1.0/(abs(df$eEVPA) * sqrt(df$eQ^2 + df$eU^2)* abs(log(df$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(df$relTime + timeWeightSoftening)))
     if( diff(range(df$relTime)) > 1.5*min(abs(df$relTime))){
@@ -70,26 +71,6 @@ SPfit <- function(df){
     fit <- fitSSM(mod, rep(log(0.1*var(df_extended[[2]], na.rm=TRUE)), 2), method = 'L-BFGS-B', lower=c(-50,-50), upper=c(50,50))
     kfs_mod <- KFS(fit$model, smoothing = c("state", "mean"))
     return(as.numeric(kfs_mod$alphahat[numData, 1]) + (0.0 + 1.0i)* sqrt(as.numeric(kfs_mod$V[1, 1, numData])))
-    #-------- Compact Log-Likelihood Function for smoothing
-    #scaledTime <- df$relTime / 1e6              # to avoid overlow
-    #DistMatrix <- as.matrix(dist(scaledTime))
-    #gp_nll <- function(poly) {      # polynimial parameters
-    #    mu    <- poly[1] + poly[2] * scaledTime
-    #    Sigma <- exp(poly[3]) * exp(-(DistMatrix / exp(poly[4]))^2) + diag((df$error + 0.001)^2)
-    #    L     <- chol(Sigma)
-    #    0.5 * (2 * sum(log(diag(L))) + sum(backsolve(L, df$Value - mu, transpose = TRUE)^2))
-    #}
-    ##-------- Fit & Extract Optimal Parameters
-    #fit <- nlminb(c(0.0, 0.0, -1, 0.01), gp_nll)$par
-    #b0  <- fit[1]; b1 <- fit[2]; sig2 <- exp(fit[3]); range <- exp(fit[4])
-    ##-------- Predict at relTime = 0.0
-    #r_target   <- sig2 * exp(-(abs(scaledTime - 0) / range)^2)
-    #Sigma_opt  <- sig2 * exp(-(DistMatrix / range)^2) + diag(df$error^2)
-    #L <- chol(Sigma_opt)
-    #residual <- df$Value - (b0 + b1 * scaledTime)
-    #alpha    <- backsolve(L, residual, transpose = TRUE)
-    #prediction <- as.numeric(b0 + t(r_target) %*% backsolve(L, alpha))
-    #return(prediction + (0.0 + 1.0i)* sqrt(as.numeric(sig2)))
 }
 #-------- Upper and lower confidence band with the given level
 KFASsmooth <- function(df, conf_level=0.99){

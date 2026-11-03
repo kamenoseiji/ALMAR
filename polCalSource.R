@@ -35,8 +35,6 @@ srcFreqCalibrator <- function(DF, band){
     return( srcDF[((srcDF$P - srcDF$eP > Pthresh12[band]) & ((srcDF$P - srcDF$eP)/(srcDF$I + srcDF$eI) > 0.03) & (srcDF$P - srcDF$eP > srcDF$subThresh)),] )     # Filter by polarized flux and polarization degree
 }
 #-------- Load Flux.Rdata from web
-#FluxDataURL <- "https://www.alma.cl/~skameno/AMAPOLA/"
-#load(url(paste(FluxDataURL, "Flux.Rdata", sep='')))     # Data frame of FLDF
 load("Flux.Rdata")     # Data frame of FLDF
 FLDF <- FLDF[as.Date(FLDF$Date) > as.Date(Today) - DateRange,]  # Data frame within DateRange
 FLDF <- FLDF[FLDF$QC > 0.1,]                                    # Quality control
@@ -48,12 +46,9 @@ FLDF$medP <- FLDF$freqRange <- numeric(nrow(FLDF))
 for(src in sourceList){ FLDF[FLDF$Src == src,]$medP <- median(FLDF[FLDF$Src == src,]$P)}
 for(src in sourceList){ FLDF[FLDF$Src == src,]$freqRange <- diff(range(FLDF[FLDF$Src == src,]$Freq))}
 FLDF <- FLDF[FLDF$medP > 0.03,]
-FLDF <- FLDF[FLDF$freqRange > 100,]
-sourceList <- sort(unique(FLDF$Src))
-numSrc <- length(sourceList)
 #-------- Loop in frequency band
 for(band in seq(1, 7)){
     #-------- Today's IQUV
-    srcDF <- na.omit(srcFreqCalibrator(FLDF, band))  # source properties (I, Q, U, V, P, EVPA) at the band
+    srcDF <- na.omit(srcFreqCalibrator(FLDF[abs(FLDF$Freq -  BandFreq[band]) < FLDF$freqRange,], band))  # source properties (I, Q, U, V, P, EVPA) at the band
     save(file=sprintf('PolCalBand%d.Rdata', band), srcDF)
 }
