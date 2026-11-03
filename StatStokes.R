@@ -9,8 +9,7 @@ estimateIQUV <- function(DF, refFreq, refDate=Sys.time()){
     df$eEVPA <- 0.5* sqrt(df$Q^2 * df$eU^2 + df$U^2 * df$eQ^2) / (df$P^2)
     IQUV <- data.frame(Src=DF$Src[1], I=0.0, Q=0.0, U=0.0, V=0.0, P=0.0, EVPA=NA, eI=0.0, eQ=0.0, eU=0.0, eV=0.0, eP=0.0, eEVPA=0.0)
     timeWeightSoftening <- 5* 86400 # 5-day softening
-    #if( (max(df$relFreq) < 0.65) | (max(df$relFreq) / min(df$relFreq) < 2.0 )){ return( IQUV )}
-    if( (max(df$relFreq) < 0.75) | (min(df$relFreq) > 1.5) ){ return( IQUV )}
+    if( (max(df$relFreq) < 0.75) | (min(df$relFreq) > 1.5) ){ return( IQUV )}   # Target frequency should be near the observed frequency range
     df$timeFreqDeparture <- (abs(df$relTime) + timeWeightSoftening) * (1.0 + abs(df$relFreq - 1))
     weight <- 1.0/(abs(df$eEVPA) * sqrt(df$eQ^2 + df$eU^2)* abs(log(df$relFreq) + 1.0)^2 * (timeWeightSoftening / abs(df$relTime + timeWeightSoftening)))
     if( diff(range(df$relTime)) > 1.5*min(abs(df$relTime))){
