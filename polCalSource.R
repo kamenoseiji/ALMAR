@@ -7,8 +7,8 @@ substructureDF <- read.table('../Substructure.txt', header=TRUE)   # Read substr
 #         Band1      2     3      4     5      6     7      8      9   10
 BandPA <- c(45.0, -45.0, 80.0, -80.0, 45.0, -45.0, 36.45, 90.0, -90.0, 0.0)*pi/180
 BandFreq<-c(43.0,  75.0, 97.5, 132.0,183.0, 233.0, 343.5,400.0, 650.0, 800.0)
-Pthresh7<-c(0.058, 0.060, 0.069, 0.058, 0.086, 0.077, 0.094, 0.153, 0.442, 0.765) # for 7m array, 5-sigma thresholds for polarized flux
-Pthresh12 <- 0.5* Pthresh7     # for 12m array 
+Pthresh7 <- c(0.058, 0.060, 0.069, 0.058, 0.086, 0.077, 0.094, 0.153, 0.442, 0.765) # for 7m array, 5-sigma thresholds for polarized flux
+Pthresh12<- c(0.050, 0.050, 0.050, 0.050, 0.050, 0.050, 0.050, 0.076, 0.221, 0.382)
 mthresh <- 0.03                                                                   # polarization degree threshold
 SECPERDAY <- 86400
 hourPerRad <- 12/pi		# radian to hour angle conversion
