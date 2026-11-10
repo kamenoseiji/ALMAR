@@ -59,28 +59,35 @@ parseScan <- function(scan){return(as.numeric(strsplit(scan, '[ |(|)|z]+')[[1]][
 #-------- Read Stokes Parameters
 readStokesSection <- function(fileName){
     fileLines <- removeBlank(readLines(fileName, skipNul=TRUE))
-    #---- Scan Entries
-    scanPointer   <- grep('EL=', fileLines)
-    scanEntryList <- fileLines[scanPointer]
-    srcVec <- as.character(sapply(scanEntryList, function(scan){ return(strsplit(scan, '[ |=]+')[[1]][3]) }))
-    ELVec  <- as.numeric(sapply(scanEntryList, function(scan){ return(strsplit(scan, '[ |=]+')[[1]][5]) }))
-    UTCVec <- lapply(scanEntryList, function(scan){ return(  strptime(strsplit(scan, '[ |=]+')[[1]][7], "%Y/%m/%d/%H:%M:%S", tz='UTC'))})
-    #---- Stokes Parameters
-    StokesPointer <- setdiff(grep('GHz', fileLines) , grep('mean', fileLines))
-    StokesEntryList <- fileLines[StokesPointer]
+    #-------- (source, time and EL)
+    elPointer <- setdiff(grep('EL=', fileLines), grep('Use', fileLines)); elEntryList <- fileLines[elPointer]; scanNum <- length(elPointer)
+    srcVec <- as.character(sapply(elEntryList, function(scan){ return(strsplit(trimws(scan), '[ |=]+')[[1]][2]) }))
+    ELVec  <- as.numeric(sapply(elEntryList, function(scan){ return(strsplit(trimws(scan), '[ |=]+')[[1]][4]) }))
+    UTCVec <- lapply(elEntryList, function(scan){return(strptime(strsplit(trimws(scan), '[ |=]+')[[1]][6], "%Y/%m/%d/%H:%M:%S", tz='UTC'))})
+    #-------- (Stokes parameters)
+    StokesPointer <- setdiff( grep('SPW[0-9]', fileLines), grep('Aeff|D-term', fileLines)); StokesEntryList <- fileLines[StokesPointer]; entryNum <- length(StokesPointer)
     StokesMatrix <- matrix(sapply(StokesEntryList, parseScan), nrow=9)
+    #-------- (UV min max entry)
+    UVentryPointer <- grep('UV_min_max', fileLines)
+    if(length(UVentryPointer) < scanNum){
+        uvVec <- rep(12.0, 2*scanNum)
+    } else {
+        uvEntryList <- fileLines[UVentryPointer]
+        uvVec <- as.numeric(sapply(uvEntryList, function(scan){ return( strsplit(trimws(scan), '\\s+')[[1]][2:3])}))
+    }
     #---- Expand scan to Stokes
-    entryNum <- length(StokesPointer)
-    srcList <- as.character(entryNum)
-    ELList  <- as.numeric(entryNum)
+    srcList <- rep('', entryNum)
+    ELList <- uvMinList <- uvMaxList <- as.numeric(entryNum)
     UTCList <- rep(UTCVec[1][[1]], entryNum)
     for(index in 1:entryNum){
-        pointer <- which(scanPointer == max( scanPointer[scanPointer < StokesPointer[index]]))
+        pointer <- which.max(elPointer[elPointer < StokesPointer[index]])
         srcList[index] <- srcVec[pointer]
         ELList[index]  <- ELVec[pointer]
+        uvMinList[index]  <- uvVec[2*pointer - 1]
+        uvMaxList[index]  <- uvVec[2*pointer]
         UTCList[index] <- UTCVec[pointer][[1]]
     }
-    return(data.frame(Src=srcList, Freq=StokesMatrix[1,], EL=ELList, I=StokesMatrix[2,], Q=StokesMatrix[4,], U=StokesMatrix[6,], V=StokesMatrix[8,], eI=StokesMatrix[3,], eQ=StokesMatrix[5,], eU=StokesMatrix[7,], eV=StokesMatrix[9,], Date=UTCList, File=rep(fileName, entryNum)))
+    return(data.frame(Src=srcList, Freq=StokesMatrix[1,], EL=ELList, I=StokesMatrix[2,], Q=StokesMatrix[4,], U=StokesMatrix[6,], V=StokesMatrix[8,], eI=StokesMatrix[3,], eQ=StokesMatrix[5,], eU=StokesMatrix[7,], eV=StokesMatrix[9,], Date=UTCList, File=rep(fileName, entryNum), uvMin=uvMinList, uvMax=uvMaxList))
 }
 #-------- Number of antennas
 getAntNum <- function(Lines){
